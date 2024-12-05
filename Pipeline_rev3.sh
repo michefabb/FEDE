@@ -4,20 +4,16 @@
 ## Place in a folder with this script the files of T1weighted and DWI of one subject with the following names:
 ## - sub-01_T1w.nii.gz , sub-01_T1w.json
 ## - sub-01_dwi.nii.gz , sub-01_dwi.json , sub-01_dwi.bval , sub-01_dwi.bvec
-## Pipeline developed using:
-## - https://andysbrainbook.readthedocs.io/en/latest/MRtrix/MRtrix_Introduction.html
-## - others from MRtrix3 Community support https://community.mrtrix.org/
-## - https://andysbrainbook.readthedocs.io/en/latest/FreeSurfer/FreeSurfer_Introduction.html for the section "Check outputs of FreeSurfer 'recon-all' command using the QA procedures for Soft Failure Types "
 
 
 # USE -grad INSTEAD OF -fslgrad FOR SOME DATA
-mrconvert sub-01_dwi.nii.gz sub-01_dwi.mif -fslgrad sub-01_dwi.bvec sub-01_dwi.bval	# crea il file .mif di mrtrix con tutti quelli di input .nii.gz .bval -bvec
+mrconvert sub-01_dwi.nii.gz sub-01_dwi.mif -fslgrad sub-01_dwi.bvec sub-01_dwi.bval	
 
 # DENOISE
-dwidenoise sub-01_dwi.mif sub-01_den.mif -noise noise.mif 		# fa il denoising del file input e crea quello in output _den.mif e quello col solo noise (noise.mif)
-mrcalc sub-01_dwi.mif sub-01_den.mif -subtract residual.mif 		# controlla il residuo non sia troppo grosso tra input e denoised (altrimenti ci sono artifacts)
+dwidenoise sub-01_dwi.mif sub-01_den.mif -noise noise.mif 		
+mrcalc sub-01_dwi.mif sub-01_den.mif -subtract residual.mif 	
 mrview residual.mif
-mrdegibbs sub-01_den.mif sub-01_den_unr.mif							# fa il degibbs, da fare solo se si vedono linee come https://mriquestions.com/gibbs-artifact.html ... io non ne vedo
+mrdegibbs sub-01_den.mif sub-01_den_unr.mif							
 
 # CREATE THE PAIR OF B0 FOR DISTORTION CORRECTION USING OUTPUT FROM SYNB0_DISCO
 # MANUAL OPERATION TO BE PERFORMED IN ADVANCE TO CREATE .bvec .bval FILES FOR THE OUTPUT OF SYNB0-DISCO (SEE BELOW) OR USE THE printf COMMANDS BELOW
@@ -40,8 +36,8 @@ PATH=${FSLDIR}/share/fsl/bin:${PATH}
 export FSLDIR PATH
 . ${FSLDIR}/etc/fslconf/fsl.sh
 export PATH="/usr/local/bin:$PATH"
-dwifslpreproc sub-01_den_unr.mif sub-01_den_preproc.mif -nocleanup -pe_dir AP -rpe_pair -se_epi b0_pair.mif -eddy_options " --slm=linear"  	# direzione AP perchè nel .json della DWI c'è "PhaseEncodingDirection": "j";
-																																																									# con -eddy_options " --slm=linear " utile per acquisizioni con meno di 60 directions (i dati di Stella Maris ne hanno 30) e -readout_time preso da "TotalReadoutTime": 0.09027 del .json della DWI
+dwifslpreproc sub-01_den_unr.mif sub-01_den_preproc.mif -nocleanup -pe_dir AP -rpe_pair -se_epi b0_pair.mif -eddy_options " --slm=linear"  	
+																																																									
 # USE data_is_shelled" OPTION AFTER slm=linear" FOR MORE bvalues
 
 # Checking the preprocessing output
@@ -62,11 +58,6 @@ dwibiascorrect ants sub-01_den_preproc.mif sub-01_den_preproc_unbiased.mif -bias
 dwi2mask sub-01_den_preproc_unbiased.mif mask.mif
 mrview mask.mif
 
-# In caso la mask non sia buona perchè mancano pezzi: you could use a command such as FSL’s bet2. For example, you could use the following code to convert the unbiased diffusion-weighted image to NIFTI format, create a mask with bet2, and then convert the mask to .mif format:
-# mrconvert sub-01_den_preproc_unbiased.mif sub-01_unbiased.nii
-# bet2 sub-01_unbiased.nii sub-01_masked -m -f 0.7
-# mrconvert sub-01_masked_mask.nii.gz mask.mif
-# You may have to experiment with the fractional intensity threshold (specified by -f) in order to generate a mask that you are satisfied with. In my experience, this can vary between 0.2 and 0.7 for most brains in order to generate an adequate mask.
 
 #CONSTRAINED SPHERICAL DECONVOLUTION
 
@@ -79,7 +70,7 @@ shview wm.txt # The first image that pops up will look like a sphere; this repre
 shview gm.txt
 shview csf.txt	
 
-# USEABLE WITH ONE BVALUE=!0 + B=0 BVAL, OTHERWISE REPLACE ss3t_csd_beta1 (REQUIRES MRTRIX3TISSUE) WITH dwi2fod msmt_csd (INCLUDED IN MRTRIX) AND MOVE THE -mask mask.mif after the input .mif
+
 # Applying the basis functions to the diffusion data WITH B=0 PLUS AT LEAST 2 B=!0:
 # dwi2fod msmt_csd sub-01_den_preproc_unbiased.mif -mask mask.mif wm.txt wmfod.mif gm.txt gmfod.mif csf.txt csffod.mif # apply the basis functions to the diffusion data. The “-mask” option specifies which voxels we will use; this is simply to restrict our analysis to brain voxels and reduce the computing time. The “.mif” files specified after each basis function will output an FOD image for that tissue type
 # mrconvert -coord 3 0 wmfod.mif - | mrcat csffod.mif gmfod.mif - vf.mif # The command mrconvert will extract the first image from the wmfod.mif file, which is the image with a b-value of 0. The output of this command is then used as the input into an mrcat command which combines the FOD images from all three tissue types into a single image that we will call “vf.mif”
@@ -103,26 +94,6 @@ mtnormalise wmfod.mif wmfod_norm.mif gmfod.mif gmfod_norm.mif csffod.mif csffod_
 mrview vf.mif -odf.load_sh wmfod_norm.mif
 
 
-# Applying the basis functions to the diffusion data WITH B=0 PLUS 1 B=!0: DISCARD THE GM.TXT (USE ONLY WM AND CSF), AS RECOMMENDED ON MRTRIX FORUM:
-# https://community.mrtrix.org/t/single-shell-vs-single-tissue/5761/6
-# https://community.mrtrix.org/t/fixel-based-analysis-on-single-shell-data/897/4
-# https://community.mrtrix.org/t/ss3t-or-2s3t-csd-implementation/801/4
-# https://community.mrtrix.org/t/lmaxes-specified-does-not-match-number-of-tissues/500/13
-# https://community.mrtrix.org/t/dwifslpreproc-error/4862/7
-# https://community.mrtrix.org/t/dwi2fod-with-fa-as-mask/2614/4
-# https://community.mrtrix.org/t/fba-single-shell-high-gm-fod-values/1746/5
-#dwi2fod msmt_csd sub-01_den_preproc_unbiased.mif -mask mask.mif wm.txt wmfod.mif csf.txt csffod.mif 	# apply the basis functions to the diffusion data. The “-mask” option specifies which voxels we will use; this is simply to restrict our analysis
-																																											# to brain voxels and reduce the computing time. The “.mif” files specified after each basis function will output an FOD image for that tissue type
-
-#mrconvert -coord 3 0 wmfod.mif - | mrcat csffod.mif - vf.mif 	# The command mrconvert will extract the first image from the wmfod.mif file, which is the image with a b-value of 0.
-																								# The output of this command is then used as the input into an mrcat command which combines the FOD images from all three tissue types into a single image that we will call “vf.mif”
-
-#mrview vf.mif -odf.load_sh wmfod.mif # The white matter FODs overlaid on an image color-coded for each tissue type. Green represents grey matter, cerebrospinal fluid is depicted as red, and white matter is shown in blue.
-															# FODs: red signalizes that the primary orientation is left-to-right, green means posterior-to-anterior, and blue represents orientations in the inferior-to-superior direction
-															
-# Normalizing the FODs
-#mtnormalise wmfod.mif wmfod_norm.mif csffod.mif csffod_norm.mif -mask mask.mif 	# global intensity normalisation
-#mrview vf.mif -odf.load_sh wmfod_norm.mif 																	# check that it remains as before
 
 
 # CREATING THE TISSUE BOUNDARY
@@ -134,8 +105,7 @@ mrview 5tt_nocoreg.mif						# check results, arrows left and right to switch typ
 
 # Coregistering the Diffusion and Anatomical Images
 # Extracting the b0 images
-dwiextract sub-01_den_preproc_unbiased.mif - -bzero | mrmath - mean mean_b0.mif -axis 3	#average together the B0 images from the diffusion data; The left half of the command, dwiextract, takes the preprocessed diffusion-weighted image as an input,
-																																					# and the -bzero option extracts the B0 images; the solitary - argument indicates that the output should be used as input for the second part of the command, to the right of the pipe. mrmath then takes these output B0 images and computes the mean along the 3rd axis, or the time dimension. In other words, if we start with an index of 0, then the number 3 indicates the 4th dimension, which simply means to average over all of the volumes.
+dwiextract sub-01_den_preproc_unbiased.mif - -bzero | mrmath - mean mean_b0.mif -axis 3	#average together the B0 images from the diffusion data; The left half of the command, dwiextract, takes the preprocessed diffusion-weighted image as an input,	and the -bzero option extracts the B0 images; the solitary - argument indicates that the output should be used as input for the second part of the command, to the right of the pipe. mrmath then takes these output B0 images and computes the mean along the 3rd axis, or the time dimension. In other words, if we start with an index of 0, then the number 3 indicates the 4th dimension, which simply means to average over all of the volumes.
 # Converting the b0 and 5tt images to nii.gz format, so that we can use FSL to coregister diffusion and anatomical images:
 mrconvert mean_b0.mif mean_b0.nii.gz
 mrconvert 5tt_nocoreg.mif 5tt_nocoreg.nii.gz
@@ -148,8 +118,7 @@ flirt -in mean_b0.nii.gz -ref 5tt_vol0.nii.gz -interp nearestneighbour -dof 6 -o
 																																									# meaning that it stays stationary. The averaged B0 images are then moved to find the best fit with the grey matter segmentation. The output of this command, “diff2struct_fsl.mat”, contains the transformation matrix that was used to overlay the diffusion image on top of the grey matter segmentation
 
 # Converting the transformation matrix to MRtrix format:
-transformconvert diff2struct_fsl.mat mean_b0.nii.gz 5tt_nocoreg.nii.gz flirt_import diff2struct_mrtrix.txt 	#  used the anatomical segmentation as the reference image. We did this because usually the coregistration is more accurate if the reference image has
-																																									# higher spatial resolution and sharper distinction between the tissue types
+transformconvert diff2struct_fsl.mat mean_b0.nii.gz 5tt_nocoreg.nii.gz flirt_import diff2struct_mrtrix.txt 	#  used the anatomical segmentation as the reference image. We did this because usually the coregistration is more accurate if the reference image has higher spatial resolution and sharper distinction between the tissue types
 
 # Applying the transformation matrix to the non-coregistered segmentation data:
 mrtransform 5tt_nocoreg.mif -linear diff2struct_mrtrix.txt -inverse 5tt_coreg.mif										# since we already have the steps to transform the diffusion image to the anatomical image, we can take the inverse of the transformation matrix to do the 																																											opposite - i.e., coregister the anatomical image to the diffusion image
@@ -162,7 +131,7 @@ mrview sub-01_den_preproc_unbiased.mif -overlay.load 5tt_nocoreg.mif -overlay.co
 																						# 5tt2gmwmi (which stands for “5 Tissue Type (segmentation) to Grey Matter / White Matter Interface)
 
 # Viewing the GM/WM boundary:
-mrview sub-01_den_preproc_unbiased.mif -overlay.load gmwmSeed_coreg.mif 		# check the result with mrview to make sure the interface is where we think it should be:
+mrview sub-01_den_preproc_unbiased.mif -overlay.load gmwmSeed_coreg.mif 		# check the result with mrview to make sure the interface is where we think it should be
 
 
 # CREATING THE STREAMLINES
@@ -173,23 +142,18 @@ mrview sub-01_den_preproc_unbiased.mif -overlay.load gmwmSeed_coreg.mif 		# chec
 #num_streamlines=1000*num_nodes*(num_nodes-1)/2 # the SC matrix is 164*164 elements, but  one row is the diagonal which is zero (hence num_nodes-1) and it is symmetric (hence /2) so the nr of couples are num_nodes*(num_nodes-1)/2 and we want at least 1000 streamlines each couple
 #num_streamlines=71631000
 
-tckgen -act 5tt_coreg.mif -backtrack -crop_at_gmwmi -nthreads 11 -maxlength 250 -power 0.33 -select 71631000 wmfod_norm.mif tracks_71631K.tck -seed_dynamic wmfod_norm.mif				# In this command, the “-act” option specifies that we will use
-																																																																							# the anatomically-segmented image to constrain our analysis to the white matter. “-backtrack” indicates for the current streamline to go back and run the same streamline again if it terminates in a strange place (e.g., the cerebrospinal fluid); “-maxlength” sets the maximum tract length, that will be permitted; and “-cutoff” specifies the FOD amplitude for terminating a tract (for example, a value of 0.06 would not permit a streamline to go along an FOD that is lower than that number). “-seed_gmwmi” takes as an input the grey-matter / white-matter boundary that was generated using the 5tt2gmwmi command. “-nthreads” specifies the number of processing cores you wish to use, in order to speed up the analysis. And finally, “-select” indicates how many total streamlines to generate. Note that a shorthand can be used if you like; instead of, say, 10000000, you can rewrite it as 10000k (meaning “ten thousand thousands”, which equals “ten million”). The last two arguments specify both the input (wmfod_norm.mif) and a label for the output (tracks_71631K.tck). Length is in [mm]; modified as in mrtrix3_connectome.py to be used also for subcortical structures, see
-# https://community.mrtrix.org/t/sc-matrices-generation-is-merged-tck-the-most-appropriate-option-and-has-act-to-be-used-when-seeding-from-subcortical-binary-gm-mask/5732/2
-# https://community.mrtrix.org/t/whole-brain-tractography-including-subcortical-structures/3982
-# https://mrtrix.readthedocs.io/en/latest/quantitative_structural_connectivity/sift.html
+tckgen -act 5tt_coreg.mif -backtrack -crop_at_gmwmi -nthreads 11 -maxlength 250 -power 0.33 -select 71631000 wmfod_norm.mif tracks_71631K.tck -seed_dynamic wmfod_norm.mif				# In this command, the “-act” option specifies that we will use the anatomically-segmented image to constrain our analysis to the white matter. “-backtrack” indicates for the current streamline to go back and run the same streamline again if it terminates in a strange place (e.g., the cerebrospinal fluid); “-maxlength” sets the maximum tract length, that will be permitted; and “-cutoff” specifies the FOD amplitude for terminating a tract (for example, a value of 0.06 would not permit a streamline to go along an FOD that is lower than that number). “-seed_gmwmi” takes as an input the grey-matter / white-matter boundary that was generated using the 5tt2gmwmi command. “-nthreads” specifies the number of processing cores you wish to use, in order to speed up the analysis. And finally, “-select” indicates how many total streamlines to generate. Note that a shorthand can be used if you like; instead of, say, 10000000, you can rewrite it as 10000k (meaning “ten thousand thousands”, which equals “ten million”). The last two arguments specify both the input (wmfod_norm.mif) and a label for the output (tracks_71631K.tck). Length is in [mm]; modified as in mrtrix3_connectome.py to be used also for subcortical structures, see
+
 
 # Extracting a subset of tracks to check them in mrview:
 tckedit tracks_71631K.tck -number 300k smallerTracks_300k.tck
 
 # Viewing the tracks in mrview:
-mrview sub-01_den_preproc_unbiased.mif -tractography.load smallerTracks_300k.tck	# inspect this image to make sure that the streamlines end where you think they should; in other words, the streamlines should be constrained to the white matter, and they
-																																			# should be color-coded appropriately. For example, the corpus callosum should be mostly red, and the corona radiata should be mostly blue
-mrview T1.mif -tractography.load smallerTracks_300k.tck													# inspect streamlines in cerebellum
+mrview sub-01_den_preproc_unbiased.mif -tractography.load smallerTracks_300k.tck	# inspect this image to make sure that the streamlines end where you think they should; in other words, the streamlines should be constrained to the white matter, and they should be color-coded appropriately. For example, the corpus callosum should be mostly red, and the corona radiata should be mostly blue
+mrview T1.mif -tractography.load smallerTracks_300k.tck		# inspect streamlines in cerebellum
 
 # Refining the Streamlines with tcksift2 (Sifting the tracks with tcksift2):
-tcksift2 -act 5tt_coreg.mif -out_mu sift_mu.txt -out_coeffs sift_coeffs.txt -nthreads 11 tracks_71631K.tck wmfod_norm.mif sift_71631K.txt -fd_scale_gm		# some tracts will be threaded with more streamlines than others, because the fiber orientation densities are much clearer and
-																																																				# more attractive candidates for the probabilistic sampling algorithm that was discussed above. In other words, certain tracts can be over-represented by the amount of streamlines that pass through them not necessarily because they contain more fibers, but because the fibers tend to all be orientated in the same direction. To counter-balance this overfitting, the command tcksift2 will create a text file containing weights for each voxel in the brain; -fd_scale_gm added as in mrtrix3_connectome.py because we use single-shell (Bvalue=0 and 1000)
+tcksift2 -act 5tt_coreg.mif -out_mu sift_mu.txt -out_coeffs sift_coeffs.txt -nthreads 11 tracks_71631K.tck wmfod_norm.mif sift_71631K.txt -fd_scale_gm		# some tracts will be threaded with more streamlines than others, because the fiber orientation densities are much clearer and more attractive candidates for the probabilistic sampling algorithm that was discussed above. In other words, certain tracts can be over-represented by the amount of streamlines that pass through them not necessarily because they contain more fibers, but because the fibers tend to all be orientated in the same direction. To counter-balance this overfitting, the command tcksift2 will create a text file containing weights for each voxel in the brain; -fd_scale_gm added as in mrtrix3_connectome.py because we use single-shell (Bvalue=0 and 1000)
 
 ## CREATING THE CONNECTOME
 # Run FreeSurfer recon-all command:
@@ -201,58 +165,14 @@ SUBJECTS_DIR=`pwd`																# SUBJECTS_DIR tells FS where to locate the fo
 #recon-all -i sub-01_T1w.nii.gz -s sub-01_recon -all						# run FS recon-all command, input -i is the T1w and -s is the name of the output folder, -all to perform all what the command recon-all can do
 
 
-## Check outputs of FreeSurfer 'recon-all' command using the QA procedures for Soft Failure Types on:
-## Volumes: T1.mgz brainmask.mgz
-## Surfaces: lh.pial rh.pial lh.white rh.white
-## using the following FreeSurfer command:
-#freeview -v sub-01_recon/mri/T1.mgz  sub-01_recon/mri/brainmask.mgz -f sub-01_recon/surf/lh.pial:edgecolor=red sub-01_recon/surf/lh.white:edgecolor=yellow sub-01_recon/surf/rh.pial:edgecolor=red sub-01_recon/surf/rh.white:edgecolor=yellow # Open Freeview with volumes and surfaces loaded as per command, also uses yellow and red for WM and GM edges
-## Check above view for following Errors:
-## SkullStripping Errors...Check coronal view slices from 136 to 144 included (cortex including piece of skull/dura mater) 
-## Pial Surfaces Erros
-## Intensity Normalization Errors... Check axial view of slices from 123 to 135 included (white matter not recognized in orbito frontal cortex?)
-#
-## View on parcellation of surface cortex and segmentation of subcortical volumes
-#freeview -v sub-01_recon/mri/orig.mgz sub-01_recon/mri/aseg.mgz:colormap=LUT sub-01_recon/mri/aparc.a2009s+aseg.mgz:colormap=LUT -f sub-01_recon/surf/lh.pial:edgecolor=red sub-01_recon/surf/lh.white:edgecolor=yellow sub-01_recon/surf/rh.pial:edgecolor=red sub-01_recon/surf/rh.white:edgecolor=yellow # launch freeview with volumes in folder mri and files orig.mgz and aseg.mgz this latter uses a colormap contained in the LookUp Table, volume aparc.a2009s+aseg.mgz contains parcellation/segmentation with Destrieux atlas; also surfaces -f in folder surf lh.pial and rh.pial with color red and lh.white and rh.white with color yellow
-
-
-# TOO MUCH SKULL REMAINS SO NEED REMOVAL...CREATE A NEW RECON-ALL COMMAND
-# IF PRESENT ERASE PREVIOUS RECON-ALL FOLDER
-#rm sub-01_recon
 
 # create a xopts.txt file with the input to the step mri_watershed
 printf 'mri_normalize -mprage -b 20 -n 5 -gentle \n mri_watershed -h 5 -atlas -useSRAS -surf sub-01_recon \n' > xopts.txt
 
-recon-all -i sub-01_T1w.nii.gz -s sub-01_recon -autorecon1 -expert xopts.txt	# to run only step 1 of the 3 of recon-all (using the options in a file called xopts.txt) and then check "mne.bem.make_watershed_bem" command in convert2TVB_format-modified.py later on
-#OLD#recon-all -skullstrip -wsthresh 5 -clean-bm -s sub-01_recon	# watershed threshold (range is 5-50, default 25) set to 5 to be very aggressive in removing skull
-#OLD#recon-all -skullstrip -clean-bm -gcut -subjid sub-01_recon		# gcut to remove dura mater and remaining skull
-#OLD#freeview -v mri/brainmask.mgz mri/T1.mgz mri/brainmask.gcuts.mgz:colormap=LUT	# This will display the excised regions in fuschia; use the overlay slider to examine where the dura excision may have cut into the cortex, such as in the frontal area
-#OLD# check the old brainmask.mgz respect to the new with freeview
-mkdir -p sub-01_recon/bem/watershed		# create the folders for the MNE command mne.bem.make_watershed_bem() later in the convert2TVB_format-modified.py script
-cp sub-01_recon/mri/sub-01_recon_inner_skull_surface sub-01_recon/bem/watershed/sub-01_recon_inner_skull_surface_noshift		# save original surface created without shift
-cp sub-01_recon/mri/sub-01_recon_outer_skull_surface sub-01_recon/bem/watershed/sub-01_recon_outer_skull_surface_noshift		# save original surface created without shift
-mris_expand sub-01_recon/mri/sub-01_recon_brain_surface 0.8 sub-01_recon/mri/sub-01_recon_inner_skull_surface							# expand the surface of brain created by "mri_watershed" command of +0.8mm radially and overwrite the existing one because the outcome surfaces of MNE mne.bem.make_watershed_bem were crossing
-mris_expand sub-01_recon/mri/sub-01_recon_outer_skin_surface -1.8 sub-01_recon/mri/sub-01_recon_outer_skull_surface				# expand the surface of skin created by "mri_watershed" command of -1.8mm radially and overwrite the existing one because the outcome surfaces of MNE mne.bem.make_watershed_bem were crossing
-cp sub-01_recon/mri/sub-01_recon_brain_surface sub-01_recon/bem/watershed/sub-01_recon_brain_surface										# copy files to the bem folder to recreate the output of mne command mne.bem.make_scalp_surfaces(subject= recon_all_name, subjects_dir = recon_all_dir) in convert2TVB_format-modified.py
-cp sub-01_recon/mri/sub-01_recon_inner_skull_surface sub-01_recon/bem/watershed/sub-01_recon_inner_skull_surface
-cp sub-01_recon/mri/sub-01_recon_outer_skull_surface sub-01_recon/bem/watershed/sub-01_recon_outer_skull_surface
-cp sub-01_recon/mri/sub-01_recon_outer_skin_surface sub-01_recon/bem/watershed/sub-01_recon_outer_skin_surface
-cp sub-01_recon/mri/brainmask.mgz sub-01_recon/bem/watershed/ws.mgz
-cp sub-01_recon/bem/watershed/sub-01_recon_brain_surface sub-01_recon/bem/brain.surf
-cp sub-01_recon/bem/watershed/sub-01_recon_inner_skull_surface sub-01_recon/bem/inner_skull.surf
-cp sub-01_recon/bem/watershed/sub-01_recon_outer_skull_surface sub-01_recon/bem/outer_skull.surf
-cp sub-01_recon/bem/watershed/sub-01_recon_outer_skin_surface sub-01_recon/bem/outer_skin.surf
-rm sub-01_recon/mri/sub-01_recon_brain_surface
-rm sub-01_recon/mri/sub-01_recon_inner_skull_surface
-rm sub-01_recon/mri/sub-01_recon_outer_skull_surface
-rm sub-01_recon/mri/sub-01_recon_outer_skin_surface
-
-#recon-all -skullstrip -clean-bm -gcut -subjid sub-01_recon									# gcut to remove dura mater and remaining skull, with "-clean-bm" overwrite the previous brainmask.mgz (cannot be used before end of -autorecon1 and does not affect the brain/skull/skin surfaces generated
-
-# HERE I EDITED THE brainmask.mgz WITH FREEVIEW TO REMOVE 2 SMALL PIECES OF SKULL (CORONAL SLICES 95-120 INCLUDED) THAT OTERWISE GENERATED A WRONG PIAL SURFACE (SKULL WAS SEEN AS BRAIN) AS IN https://surfer.nmr.mgh.harvard.edu/fswiki/FreeviewGuide/FreeviewTools/ReconEdit; THE FILES BEFORE EDITING ARE IN MRI FOLDER, CALLED "BACKUP_BEFORE_EDITING_WITH_FREEVIEW_brainmask.auto.mgz" AND "BACKUP_BEFORE_EDITING_WITH_FREEVIEW_brainmask.mgz"
+recon-all -i sub-01_T1w.nii.gz -s sub-01_recon -autorecon1 -expert xopts.txt	
 
 recon-all -s sub-01_recon -autorecon2 -careg # -careg is needed only for FreeSurfer7.3.2 because of a bug of this version (does not create the talairach.m3z) 
-# edited the wm.mgz, the original file is wm_backup_before_edit.mgz, then run with new white matter mask (edited); to add white voxels (use Binary as color of the wm.mgz) which should be white matter, see https://surfer.nmr.mgh.harvard.edu/fswiki/FsTutorial/TopologicalDefect_freeview ... voxels 90-108 coronal view were edited, you can see the original file in BACKUP_BEFORE_EDITING_WITH_FREEVIEW_wm.mgz
-recon-all -s sub-01_recon -autorecon2-wm 
+#recon-all -s sub-01_recon -autorecon2-wm 
 recon-all -s sub-01_recon -autorecon3
 
 # Check outputs of FreeSurfer 'recon-all' command using the QA procedures for Soft Failure Types on:
@@ -261,7 +181,7 @@ recon-all -s sub-01_recon -autorecon3
 # using the following FreeSurfer command:
 freeview -v sub-01_recon/mri/T1.mgz  sub-01_recon/mri/brainmask.mgz -f sub-01_recon/surf/lh.pial:edgecolor=red sub-01_recon/surf/lh.white:edgecolor=yellow sub-01_recon/surf/rh.pial:edgecolor=red sub-01_recon/surf/rh.white:edgecolor=yellow # Open Freeview with volumes and surfaces loaded as per command, also uses yellow and red for WM and GM edges
 # Check above view for following Errors:
-# SkullStripping Errors...Check coronal view slices from 136 to 144 included (cortex including piece of skull/dura mater) before editing, now fixed
+# SkullStripping Errors...
 # Pial Surfaces Errors
 # Intensity Normalization Errors... 
 # View on parcellation of surface cortex and segmentation of subcortical volumes
