@@ -197,75 +197,19 @@ freeview -v sub-01_recon/mri/T1.mgz  sub-01_recon/mri/brainmask.mgz -f sub-01_re
 # FS WANTS ALL FOLDERS IN HIS ORIGINAL subjects FOLDER...MAYBE A BUG? SO I HAVE TO MOVE ALL TO THAT FOLDER AND THEN BACK
 ORIGINAL_SUBJECTS_DIR=$SUBJECTS_DIR
 SUBJECTS_DIR=$FREESURFER_HOME/subjects
-#cp -R sub-01_recon $FREESURFER_HOME/subjects
-#rm -r sub-01_recon
-# I CANNOT USE ABOVE COMMANDS ON MY MAC, SO COPY sub-01_recon folder manually in /Applications/freesurfer/7.3.2/subjects and give right to write on the folder to Everybody
+cp -R sub-01_recon $FREESURFER_HOME/subjects
+rm -r sub-01_recon
+
 
 mri_surf2surf --srcsubject fsaverage --trgsubject sub-01_recon --hemi lh --sval-annot $SUBJECTS_DIR/fsaverage/label/lh.HCPMMP1.annot --tval $SUBJECTS_DIR/sub-01_recon/label/lh.HCPMMP1.annot
 mri_surf2surf --srcsubject fsaverage --trgsubject sub-01_recon --hemi rh --sval-annot $SUBJECTS_DIR/fsaverage/label/rh.HCPMMP1.annot --tval $SUBJECTS_DIR/sub-01_recon/label/rh.HCPMMP1.annot
 mri_aparc2aseg --old-ribbon --s sub-01_recon --annot HCPMMP1 --o $SUBJECTS_DIR/sub-01_recon/mri/aparc.HCPMMP1+aseg.mgz
-#cp -R $FREESURFER_HOME/subjects/sub-01_recon $ORIGINAL_SUBJECTS_DIR
-#rm -r $FREESURFER_HOME/subjects/sub-01_recon
+cp -R $FREESURFER_HOME/subjects/sub-01_recon $ORIGINAL_SUBJECTS_DIR
+rm -r $FREESURFER_HOME/subjects/sub-01_recon
 SUBJECTS_DIR=$ORIGINAL_SUBJECTS_DIR
 # after finished copy the only new files to the original sub-01_recon folder: sub-01_recon/mri/aparc.HCPMMP1+aseg.mgz , sub-01_recon/label/lh.HCPMMP1.annot , sub-01_recon/label/rh.HCPMMP1.annot ...then remove the sub-01_recon folder in $FREESURFER_HOME/subjects folder
 # View on parcellation of surface cortex and segmentation of subcortical volumes
 freeview -v sub-01_recon/mri/orig.mgz sub-01_recon/mri/aseg.mgz:colormap=LUT sub-01_recon/mri/aparc.HCPMMP1+aseg.mgz:colormap=LUT -f sub-01_recon/surf/lh.pial:edgecolor=red sub-01_recon/surf/lh.white:edgecolor=yellow sub-01_recon/surf/rh.pial:edgecolor=red sub-01_recon/surf/rh.white:edgecolor=yellow # launch freeview with volumes in folder mri and files orig.mgz and aseg.mgz this latter uses a colormap contained in the LookUp Table, volume aparc+aseg.mgz contains parcellation/segmentation with DK atlas; aparc.a2009s+aseg.mgz for Destrieux; aparc.HCPMMP1+aseg.mgz for HCPMM1; also surfaces -f in folder surf lh.pial and rh.pial with color red and lh.white and rh.white with color yellow
-
-# IN ORDER TO EDIT SKULL SURFACES WITH BLENDER, FIRST .surf FILES MUST BE CONVERTED TO .obj WITH BELOW CODE (see MNE website https://mne.tools/stable/auto_tutorials/forward/80_fix_bem_in_blender.html#tut-fix-meshes)
-# IF NO NEED TO EDIT WITH BLENDER, COMMENT THE BELOW UP TO "END OF SKULL EDITING PART WITH MNE/BLENDER"
-conda activate mne
-python 
-import mne
-#import os
-
-coords, faces = mne.read_surface( "sub-01_recon/bem/inner_skull.surf")															 # read the inner_skull.surf file
-mne.write_surface("sub-01_recon/bem/inner_skull.obj", coords, faces, overwrite=True)									# creates the .obj file for inner_skull
-
-coords, faces = mne.read_surface("sub-01_recon/bem/outer_skull.surf")															# read the outer_skull.surf file
-mne.write_surface("sub-01_recon/bem/outer_skull.obj", coords, faces, overwrite=True)									# creates the .obj file for outer_skull
-
-#coords, faces = mne.read_surface( "sub-01_recon/bem/brain.surf")
-#mne.write_surface("sub-01_recon/bem/brain.obj", coords, faces, overwrite=True)
-
-#coords, faces = mne.read_surface( "sub-01_recon/bem/outer_skin.surf")
-#mne.write_surface("sub-01_recon/bem/outer_skin.obj", coords, faces, overwrite=True)
-
-#recon_all_name     = "sub-01_recon"
-#recon_all_dir      = "/Users/michelangelo/Stella_Maris_Data/Test_skullstripping"
-#mne.bem.make_scalp_surfaces(subject= recon_all_name, subjects_dir = recon_all_dir)									# creates the -head.fif files with different densities of mesh since the outcome of mne.bem.make_watershed_bem had crossing surfaces
-#os.rename('sub-01_recon/bem/sub-01_recon-head-dense.fif', 'sub-01_recon/bem/sub-01_recon-head.fif')		# rename the -head-dense.fif file to -head.fif to be used by MNE
-#surf = mne.read_bem_surfaces("sub-01_recon/bem/sub-01_recon-head.fif")[0]
-#coords = surf["rr"]
-#faces = surf["tris"]
-#mne.write_surface("sub-01_recon/bem/sub-01_recon-head.obj", coords, faces, overwrite=True)
-
-coords, faces = mne.read_surface( "sub-01_recon/surf/lh.pial.T1")															 # read the left pial surface  file
-mne.write_surface("sub-01_recon/bem/lhpial.obj", coords, faces, overwrite=True)									# creates the .obj file for left pial surface
-coords, faces = mne.read_surface( "sub-01_recon/surf/rh.pial.T1")															 # read the right pial surface file
-mne.write_surface("sub-01_recon/bem/rhpial.obj", coords, faces, overwrite=True)									# creates the .obj file for right pial surface
-exit()
-
-# IMPORT .obj IN BLENDER,  EDIT, EXPORT .obj (see MNE website https://mne.tools/stable/auto_tutorials/forward/80_fix_bem_in_blender.html#tut-fix-meshes)
-# I EDITED THE inner_skull.surf IN BLENDER USING Blender_model_inner_skull_before_apply_rev0.blend WHERE YOU CAN SEE THE EDIT I DID, AND Blender_model_inner_skull_after_apply_rev0.blend AFTER CLICKING APPLY
-# THEN USE THE BELOW CODE TO CREATE THE .SURF FILES (see MNE website https://mne.tools/stable/auto_tutorials/forward/80_fix_bem_in_blender.html#tut-fix-meshes)
-
-python 
-import mne
-coords, faces = mne.read_surface("sub-01_recon/bem/inner_skull.obj")																	# read the inner_skull.obj modified in Blender
-_, _, vol_info = mne.read_surface("sub-01_recon/bem/inner_skull.surf", read_metadata=True)								# read the metadata from the original .surf file
-mne.write_surface("sub-01_recon/bem/inner_skull.surf", coords, faces, volume_info=vol_info, overwrite=True)		# overwrite the old .surf file using the new .obj file edited in Blender and the metadata from the old .surf file
-
-#coords, faces = mne.read_surface("sub-01_recon/bem/outer_skull.obj")
-#_, _, vol_info = mne.read_surface("sub-01_recon/bem/outer_skull.surf", read_metadata=True)
-#mne.write_surface("sub-01_recon/bem/outer_skull.surf", coords, faces, volume_info=vol_info, overwrite=True)
-
-#coords, faces = mne.read_surface("sub-01_recon/bem/sub-01_recon-head.obj")
-#mne.write_head_bem("sub-01_recon/bem/sub-01_recon-head.fif", coords, faces, overwrite=True)
-exit()
-conda deactivate
-#"END OF SKULL EDITING PART WITH MNE/BLENDER" 
-
-
 
 
 ## ---------------------- ##
