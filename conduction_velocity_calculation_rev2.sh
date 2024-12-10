@@ -1,5 +1,9 @@
 #!bin/sh
 
+## the below contains parts based on the publication:
+# Newman BT, Jacokes Z, Venkadesh S, Webb SJ, Kleinhans NM, McPartland JC, et al. (2024) Conduction velocity, G-ratio, and extracellular
+# water as microstructural characteristics of autism spectrum disorder. PLoS ONE 19(4): e0301964. https://doi.org/10.1371/journal.pone.0301964
+
 # INPUTS:
 # sub-01_T1w.nii.gz (T1w image)
 # sub-01_T2w_FLAIR_coreg.nii.gz (T2w image)
