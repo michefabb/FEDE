@@ -41,18 +41,7 @@ from tvb.datatypes.projections import ProjectionMatrix, ProjectionSurfaceEEG
 from tvb.datatypes.sensors import SensorsEEG
 from tvb.datatypes import connectivity
 import json
-########################################################################################################## 
-# path_to_input_data = "/home/bbpnrsoa/TVB_output/"
-# save_path='/home/bbpnrsoa/Results/'
-# path_to_input_data = "/Users/michelangelo/Stella_Maris_Data/Stella_Maris_Patient_SS3T-CSD/output_tvb_converter/TVB_output/"
-# save_path_LocConn="/Users/michelangelo/Stella_Maris_Data/Stella_Maris_Patient_SS3T-CSD/output_tvb_converter/TVB_output/"
-# save_path_h5GUI="/Users/michelangelo/Stella_Maris_Data/Stella_Maris_Patient_SS3T-CSD/h5_inputs_for_GUI/"
-# subject_name="sub-01"
-# sigma=0.5
-# amp=1.0
-# midpoint=0.0
-# offset=0.0
-########################################################################################################## 
+
 # for Local Connectivity Matrix calculation the below values do not change the results and are not saved, but are needed to run the .configure parts; same for the h5 files
 scale_weights=13366.0
 local_coupling_strength = 0.1
@@ -116,7 +105,7 @@ ctx.local_connectivity = loc_conn
 ctx.coupling_strength = numpy.array([local_coupling_strength], dtype=float)
 ctx.local_connectivity.matrix = None # needed? just to be sure it is recalculated
 ctx.compute_local_connectivity() # needed? just to be sure it is recalculated
-ctx.local_connectivity.matrix = (ctx.local_connectivity.matrix+ctx.local_connectivity.matrix.T)/2 # to make symmetric the distance i to j and j to i, see https://groups.google.com/g/tvb-users/c/E6VA7hCSFmc/m/jS-ggjyUAAAJ
+ctx.local_connectivity.matrix = (ctx.local_connectivity.matrix+ctx.local_connectivity.matrix.T)/2 # to make symmetric the distance i to j and j to i
 # below to set to 0 the local connectivity elements of dummy regions...loc con matrix is a csc sparse matrix of scipy.sparse.csc_matrix, need to use its operations
 from scipy.sparse import csc_matrix, eye
 remove=eye(ctx.vertices.shape[0],dtype=float).tolil() # this creates an identity sparse matrix
@@ -130,16 +119,7 @@ ctx.local_connectivity.configure()
 
 
 ctx.configure()
-##########################################################################################################  
 
-
-mons = (
-    monitors.EEG(sensors=sensorsEEG, projection=prEEG, region_mapping=rm, period=fsamp, reference=None, variables_of_interest=numpy.array([0])),
-)
-mons[0].configure()
-# if reference=None it is the idealized reference-free EEG; if reference="average" it is used the average reference; if reference= name of EEG sensor, it is used that sensor as reference
-# variables_of_interest= if not specified, it uses the variables_of_interest used in the model; 
-##########################################################################################################
 ##########################################################################################################
 # SAVE FILES
 ##########################################################################################################
