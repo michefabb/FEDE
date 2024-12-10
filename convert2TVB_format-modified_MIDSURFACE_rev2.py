@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Sun Jul  9 16:56:40 2023
 
-@author: michelangelo
-"""
 # rev1:
 # - added conduction velocity map to TVB inputs files
 # rev2:
 # - modified in order to use Brainstorm or SimNIBS instead of MNE for computation of Leadfield Matrix
 
+## the below contains parts taken from TVB Pipeline Converter available at https://github.com/BrainModes/tvb-pipeline-converter
+## and based on the publication:
+## Schirner, M., Domide, L., Perdikis, D., Triebkorn, P., Stefanovski, L., Pai, R., ... & Ritter, P. (2022). Brain simulation as a cloud service: The Virtual Brain on EBRAINS. NeuroImage, 118973.
 
 
 import argparse
@@ -72,30 +71,12 @@ pipeline_name      = "TVB"
 # task_name          = args.task_name
 
 
-# recon_all_name     = "sub-01_recon"
-# recon_all_dir      = "/Users/michelangelo/Stella_Maris_Data/Stella_Maris_Patient_SS3T-CSD/"
-# parcellation       = "hcpmmp1"
-# mrtrix_output_dir  = "/Users/michelangelo/Stella_Maris_Data/Stella_Maris_Patient_SS3T-CSD/output_tvb_converter/mrtrix_output"
-# participant_label  = "01"
-# parc_image         = "/Users/michelangelo/Stella_Maris_Data/Stella_Maris_Patient_SS3T-CSD/sub-01_parc-hcpmmp1_indices.nii.gz"
-# tvb_output         = "/Users/michelangelo/Stella_Maris_Data/Stella_Maris_Patient_SS3T-CSD/output_tvb_converter/TVB_output"
-# tvb_workdir        = "/Users/michelangelo/Stella_Maris_Data/Stella_Maris_Patient_SS3T-CSD/output_tvb_converter/TVB_output/tmp"
-# n_cpus             = 11
-# weights_path       = "/Users/michelangelo/Stella_Maris_Data/Stella_Maris_Patient_SS3T-CSD/sub-01_parcels_coreg_connectome.csv"
-# tracts_path        = "/Users/michelangelo/Stella_Maris_Data/Stella_Maris_Patient_SS3T-CSD/sub-01_parcels_coreg_meanlength.csv"
-# velocities_path    = "/Users/michelangelo/Stella_Maris_Data/Stella_Maris_Patient_SS3T-CSD/sub-01_parcels_coreg_meanvelocity.csv"
-# input_dir          = "/Users/michelangelo/Stella_Maris_Data/Stella_Maris_Patient_SS3T-CSD/input_dir"
-# leadfield_path     = "/Users/michelangelo/Stella_Maris_Data/Stella_Maris_Patient_SS3T-CSD/SimNIBS/leadfield"
-# #fMRI_ROI_ts        = args.fMRI_ROI_ts
-# #task_name          = args.task_name
-# pipeline_name      = "TVB"
 
 # Set Freesurfer enviornment variable in the MNE config file, which can be found with the MNE command print(mne.get_config_path())
 mne.set_config("FREESURFER_HOME", "/Applications/freesurfer/7.3.2", home_dir=None, set_env=True)
 mne.set_config("FS_LICENSE", "/Users/michelangelo/license.txt", home_dir=None, set_env=True)
 # do not set SUBJECTS_DIR...all the scripts below read it from the variable recon_all_dir
-# os.environ['SUBJECTS_DIR']=recon_all_dir
-# os.system("/Applications/freesurfer/7.3.2/SetUpFreeSurfer.sh")
+
 
 #%%
 # =============================================================================
@@ -179,7 +160,7 @@ if parcellation in ["desikan", "destrieux", "hcpmmp1"]: # i.e. surface parcellat
     
     # create region map of high_res pial surface
     region_map = np.zeros((n_vert))
-    n_regions = mrtrix_lut.shape[0]+2 # MODIFICHE X CORTEX NOHOLES: AGGIUNTO +2
+    n_regions = mrtrix_lut.shape[0]+2 # CORTEX NOHOLES: ADDED +2
     
     # load labels according to mrtrix lut order !!!
     r = 1
@@ -201,16 +182,14 @@ if parcellation in ["desikan", "destrieux", "hcpmmp1"]: # i.e. surface parcellat
     # they are corresponding to "subcortical" vertices, i.e. on the brain "inside" of the cortical surface
     # delete those from region map and cortical surface vertices and tris
     ind_sub_vert = np.where(region_map==0)[0]
-    ## MODIFICHE X CORTEX NOHOLES: HO COMMENTATO LE DUE LINEE 180 E 181 E SCRITTO LE 182-185, POI COMMENTATO LE 189-203
-    #pial_vertices = np.delete(pial_vertices, ind_sub_vert, 0)
-    #region_map = region_map[region_map!=0] # remove "subcortical" vertices
+
     region_names=np.append(region_names, ['L_NonCortical_Dummy_Surfaces'])
     cortical=np.append(cortical, [1])
     hemisphere=np.append(hemisphere, [0])
     region_names=np.append(region_names, ['R_NonCortical_Dummy_Surfaces'])
     cortical=np.append(cortical, [1])
     hemisphere=np.append(hemisphere, [1])
-    # MODIFICHE X CORTEX NOHOLES: PER DIVIDERE TRA DUMMY REGION LEFT E RIGHT
+    # TO SPLIT DUMMY REGION LEFT AND RIGHT
     for i in range(len(region_map)):
         if region_map[i]==0 :
             if  i <= n_vert_l-1 : # left hemisphere
@@ -222,21 +201,7 @@ if parcellation in ["desikan", "destrieux", "hcpmmp1"]: # i.e. surface parcellat
             
     region_map -= 1 # reduce labels by 1, to start from 0 again
     
-    # # get triangles which contains these "subcorical" vertices
-    # mask = np.isin(pial_tris, ind_sub_vert)
-    # rows, cols = np.nonzero(mask)
-    # rows = np.unique(rows)
-    
-    # # delete tris
-    # pial_tris = np.delete(pial_tris, rows,0)
-    
-    # # update tri indices
-    # kk = []
-    # for i in range(len(ind_sub_vert)):
-    #     ind = ind_sub_vert[i]
-    #     if pial_tris[pial_tris > ind ].sum() == 0: kk.append(ind)
-    #     pial_tris[pial_tris > ind ] -= 1 
-    #     ind_sub_vert -= 1
+
     
 elif parcellation in ["aal", "aal2", "craddock200", "craddock400", "perry512"]: #i.e. volumetric parcellations
     
@@ -245,7 +210,7 @@ elif parcellation in ["aal", "aal2", "craddock200", "craddock400", "perry512"]: 
     gii_l = nib.load(tvb_workdir+"/lh."+parcellation+".pial.label.gii")
     region_map = np.concatenate((gii_l.darrays[0].data, gii_r.darrays[0].data))
     
-    # too identify "subcortical" voxel we still load e.g. desikan annot file and use it as a mask
+    # to identify "subcortical" voxel we still load e.g. desikan annot file and use it as a mask
     region_map_mask = np.zeros((n_vert))
     
     # load label for vertices from any freesurfer annot files
@@ -318,7 +283,7 @@ elif parcellation in ["aal", "aal2", "craddock200", "craddock400", "perry512"]: 
 # compute source space 
 # =============================================================================
 # decimate surface
-#pial_dec = mne.decimate_surface(pial_vertices, pial_tris, n_triangles=5120, method="sphere") # default was n_triangles=30000 and no method, TVB default cortex has 32760 triangles 
+# pial_dec = mne.decimate_surface(pial_vertices, pial_tris, n_triangles=5120, method="sphere") # default was n_triangles=30000 and no method, TVB default cortex has 32760 triangles 
 pial_dec=(pial_vertices, pial_tris)
 
 # complete decimated surface (add normals + other parameters)
@@ -368,9 +333,9 @@ region_map_lores = region_map[idx]
 
 np.savetxt(tvb_output+"/sub-"+participant_label+"_region_mapping.txt", region_map_lores, fmt="%i")
 print("Regionmap saved !")
-# MODIFICHE X CORTEX NOHOLES: METTO 0 ALLA PROJECTION MATRIX DOVE CI SONO I VERTEX CORRISPONDENTI ALLE REGIONS DUMMY
+# 0 AT PROJECTION MATRIX WHERE VERTEX OF DUMMY REGIONS
 
-leadfield_new=np.array(sio.loadmat(leadfield_path+"/sub-"+participant_label+"_EEGProjection_wdummy.mat")['ProjectionMatrix']) # load the file from Brainstorm
+leadfield_new=np.array(sio.loadmat(leadfield_path+"/sub-"+participant_label+"_EEGProjection_wdummy.mat")['ProjectionMatrix']) # load the file 
 for i in range(len(region_map_lores)):
     if region_map_lores[i]==len(region_names)-1 or region_map_lores[i]==len(region_names)-2:
         leadfield_new[:,i]=0
@@ -405,7 +370,7 @@ for i in range(len(region_names)):
 
 darrays = [nbg.GiftiDataArray(region_map_lores.astype("int32"), intent="NIFTI_INTENT_LABEL", datatype=8)]
 gii_image = nbg.GiftiImage(darrays=darrays, labeltable=gii_labeltb)
-#nbg.giftiio.write(gii_image, BIDS_anat_folder+"/sub-"+participant_label+"_space-individual_dparc.label.gii") # giftiio.write deprecated by Nibabel 3.2.2, use nibabel.save() https://nipy.org/nibabel/changelog.html and https://neurostars.org/t/save-functional-data-as-surface-with-nilearn/21945/2
+
 nib.save(gii_image, BIDS_anat_folder+"/sub-"+participant_label+"_space-individual_dparc.label.gii")    
 
 
@@ -437,12 +402,12 @@ shutil.rmtree(cort_surf_path)
 # save in BIDS format
 darrays = [nbg.GiftiDataArray(pial_vert_converted.astype("float32"), intent="NIFTI_INTENT_POINTSET")] + [nbg.GiftiDataArray(pial_complete['tris'].astype("int32"), intent="NIFTI_INTENT_TRIANGLE")]
 gii_image = nbg.GiftiImage(darrays=darrays)
-#nbg.giftiio.write(gii_image, BIDS_anat_folder+"/sub-"+participant_label+"_space-individual_pial.surf.gii")
-nib.save(gii_image, BIDS_anat_folder+"/sub-"+participant_label+"_space-individual_pial.surf.gii")  # giftiio.write deprecated by Nibabel 3.2.2, use nibabel.save() https://nipy.org/nibabel/changelog.html and https://neurostars.org/t/save-functional-data-as-surface-with-nilearn/21945/2
+
+nib.save(gii_image, BIDS_anat_folder+"/sub-"+participant_label+"_space-individual_pial.surf.gii")  
 
 
 
-# write BEM surfaces too file
+# write BEM surfaces to file
 #names = ["inner_skull_surface", "outer_skull_surface", "outer_skin_surface"] # "brain_surface",
 names = ["outer_skin"] # # to read the surface from Brainstorm
 BIDS_names = ["scalp"]
@@ -454,19 +419,16 @@ for i in range(len(names)) :
     if not os.path.exists(bem_path):
         os.makedirs(bem_path)
         
-    #bem_surf = mne.read_surface(recon_all_dir+"/"+recon_all_name+"/bem/watershed/"+recon_all_name+"_"+name)
-    #bem_surf = mne.read_surface(leadfield_path+"/"+name) # to read the surfaces modified in Blender in the /bem folder and not the original surfaces from FreeSurfer
-    #bem_dict = {'rr':bem_surf[0], 'tris':bem_surf[1]}
-    #bem_dict = {'rr':np.loadtxt("/Users/michelangelo/vertices.txt"), 'tris':np.loadtxt("/Users/michelangelo/triangles.txt", dtype=int)-1}
+
     bem_dict = {'rr':np.array(sio.loadmat(leadfield_path+"/sub-"+participant_label+"_outer_skin.mat")['vertices']), 'tris':np.array(sio.loadmat(leadfield_path+"/sub-"+participant_label+"_outer_skin.mat")['triangles'],dtype=int)-1}
     bem_complete = mne.surface.complete_surface_info(bem_dict)
     
-    #bem_vert_converted = affine_xfm.dot(np.concatenate((bem_complete['rr'] ,np.ones((bem_complete['rr'].shape[0],1))), axis=1).T)[:3,:].T
+
 
     
     # save files
     np.savetxt(bem_path+"triangles.txt", bem_complete['tris'], fmt="%i")
-    #np.savetxt(bem_path+"vertices.txt", bem_vert_converted, fmt="%f")
+
     np.savetxt(bem_path+"vertices.txt", bem_complete['rr'], fmt="%f")
     np.savetxt(bem_path+"normals.txt", bem_complete['nn'], fmt="%f")
     
@@ -475,26 +437,14 @@ for i in range(len(names)) :
     shutil.rmtree(bem_path)
 
     # save for BIDS
-    #darrays = [nbg.GiftiDataArray(bem_vert_converted.astype("float32"), intent="NIFTI_INTENT_POINTSET")] + [nbg.GiftiDataArray(bem_complete['tris'].astype("int32"), intent="NIFTI_INTENT_TRIANGLE")]
     darrays = [nbg.GiftiDataArray(bem_complete['rr'].astype("float32"), intent="NIFTI_INTENT_POINTSET")] + [nbg.GiftiDataArray(bem_complete['tris'].astype("int32"), intent="NIFTI_INTENT_TRIANGLE")]
     gii_image = nbg.GiftiImage(darrays=darrays)
-    #nbg.giftiio.write(gii_image, BIDS_anat_folder+"/sub-"+participant_label+"_space-individual_" + BIDS_name + ".surf.gii") # giftiio.write deprecated by Nibabel 3.2.2, use nibabel.save() https://nipy.org/nibabel/changelog.html and https://neurostars.org/t/save-functional-data-as-surface-with-nilearn/21945/2
     nib.save(gii_image, BIDS_anat_folder+"/sub-"+participant_label+"_space-individual_" + BIDS_name + ".surf.gii")
 
 print("BEM surfaces saved  !")
 
-# save eeg_locations, are in ras-tkr coordinates used by freesurfer
-# for them to allign with parc_image, use affine transform to bring them into ras-scanner
-# eegp_loc_converted = affine_xfm.dot(np.concatenate((eegp_loc * 1000 ,np.ones((eegp_loc.shape[0],1))), axis=1).T)[:3,:].T
+# save eeg_locations
 
-# f = open(tvb_output+"/sub-"+participant_label+"_EEG_Locations.txt", "w")
-# f_bids = open(BIDS_eeg_folder+"/sub-"+participant_label+"_task-simulation_electrodes.tsv", "w")
-# f_bids.write("name\tx\ty\tz\n")
-# for i in range((np.array(ch_type)=="eeg").sum()): # write only "eeg" electrodes (not "misc")
-#     f.write(mon.ch_names[i]+" "+"%.6f" %eegp_loc_converted[i,0]+" "+"%.6f" %eegp_loc_converted[i,1]+" "+"%.6f" %eegp_loc_converted[i,2]+"\n")
-#     f_bids.write(mon.ch_names[i]+"\t"+"%.6f" %eegp_loc_converted[i,0]+"\t"+"%.6f" %eegp_loc_converted[i,1]+"\t"+"%.6f" %eegp_loc_converted[i,2]+"\n")
-# f.close()
-# f_bids.close()
 shutil.copyfile(leadfield_path+"/sub-01_EEG_Locations.txt",tvb_output+"/sub-"+participant_label+"_EEG_Locations.txt")
 if os.path.exists(leadfield_path+"/sub-01_task-simulation_electrodes.tsv"):
     shutil.copyfile(leadfield_path+"/sub-01_task-simulation_electrodes.tsv",BIDS_eeg_folder+"/sub-"+participant_label+"_task-simulation_electrodes.tsv")
@@ -509,7 +459,7 @@ if not os.path.exists(tvb_connectome_path):
 
 # 1 weights, set diagonal to zero and make it symmetric
 weights = np.genfromtxt(weights_path, delimiter=",")
-# MODIFICHE X CORTEX NOHOLES: AGGIUNGE LE DUE DUMMY REGIONS
+# ADDED TWO DUMMY REGIONS
 col_zero_w=np.zeros((weights.shape[0],2))
 row_zero_w=np.zeros((2,weights.shape[1]+2))
 weights = np.append(weights, col_zero_w, axis=1) 
@@ -524,7 +474,7 @@ print("Weights saved  !")
 
 # 2 tracts, set diagonal to zero and make it symmetric
 tracts  = np.genfromtxt(tracts_path, delimiter=",")
-# MODIFICHE X CORTEX NOHOLES: AGGIUNGE LE DUE DUMMY REGIONS
+# ADDED TWO DUMMY REGIONS
 col_zero_t=np.zeros((tracts.shape[0],2))
 row_zero_t=np.zeros((2,tracts.shape[1]+2))
 tracts = np.append(tracts, col_zero_t, axis=1) 
@@ -557,7 +507,7 @@ for i in range(img_data.max()):
     f.write(region_names[i]+" %.6f" %center[0]+" %.6f" %center[1]+" %.6f" %center[2]+"\n")
     f_bids.write(region_names[i]+"\t%.6f" %center[0]+"\t%.6f" %center[1]+"\t%.6f" %center[2]+"\n")
 
-# MODIFICHE X CORTEX NOHOLES: AGGIUNGE LE DUE DUMMY REGIONS CON COORDINATE LEFT -1,0,0 e RIGHT 1,0,0 NELLE PROSSIME 4 RIGHE
+# ADDED TWO DUMMY REGIONS WITH COORDINATES LEFT -1,0,0 e RIGHT 1,0,0 
 f.write(region_names[len(region_names)-2]+" %.6f" %-1+" %.6f" %0+" %.6f" %0+"\n")
 f_bids.write(region_names[len(region_names)-2]+"\t%.6f" %-1+"\t%.6f" %0+"\t%.6f" %0+"\n")
 f.write(region_names[len(region_names)-1]+" %.6f" %1+" %.6f" %0+" %.6f" %0+"\n")
@@ -614,8 +564,7 @@ elif parcellation =="destrieux":
     
 elif parcellation=="hcpmmp1":
     np.savetxt(tvb_connectome_path+"cortical.txt", cortical, fmt="%i")
-#cortical = np.ones((n_regions,1)).astype('int') 
-#np.savetxt(tvb_connectome_path+"cortical.txt", cortical, fmt="%i")
+
 print("Cortical saved !")
 
 
@@ -658,7 +607,7 @@ with open(BIDS_connectivity_folder+"/sub-"+participant_label+"_conndata-network_
 
 # 8 conduction velocity, set diagonal to zero and make it symmetric
 velocities  = np.genfromtxt(velocities_path, delimiter=",")
-# MODIFICHE X CORTEX NOHOLES: AGGIUNGE LE DUE DUMMY REGIONS
+# ADDED TWO DUMMY REGIONS
 col_zero_v=np.zeros((velocities.shape[0],2))
 row_zero_v=np.zeros((2,velocities.shape[1]+2))
 velocities = np.append(velocities, col_zero_v, axis=1) 
