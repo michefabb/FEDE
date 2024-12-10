@@ -19,7 +19,8 @@ mrdegibbs sub-01_den.mif sub-01_den_unr.mif
 # MANUAL OPERATION TO BE PERFORMED IN ADVANCE TO CREATE .bvec .bval FILES FOR THE OUTPUT OF SYNB0-DISCO (SEE BELOW) OR USE THE printf COMMANDS BELOW
 printf '0.000000 0.000000 0.000000 \n' > b0_u.bvec
 printf '0 \n' > b0_u.bval
-mrconvert b0_u.nii.gz -fslgrad b0_u.bvec b0_u.bval mean_b0_PA.mif # b0_u.nii.gz is the output from SYNB0-DISCO, b0_u.bval is the file with so many 0 as the number of b0 (e.g. 4-off b0 hence
+mrconvert b0_u.nii.gz -fslgrad b0_u.bvec b0_u.bval mean_b0_PA.mif 
+# b0_u.nii.gz is the output from SYNB0-DISCO, b0_u.bval is the file with so many 0 as the number of b0 (e.g. 4-off b0 hence
 # 0 0 0 0
 #), b0_u.bvec is the file with rows of 0 0 0 as the number of b0 (e.g. 4-off b0 hence
 # 0 0 0
