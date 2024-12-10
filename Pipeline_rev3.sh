@@ -192,7 +192,7 @@ freeview -v sub-01_recon/mri/T1.mgz  sub-01_recon/mri/brainmask.mgz -f sub-01_re
 # lh.HCPMMP1.annot https://ndownloader.figshare.com/files/5528816
 # rh.HCPMMP1.annot https://ndownloader.figshare.com/files/5528819
 # and place them in the folder /Applications/freesurfer/7.3.2/subjects/fsaverage/label
-# for instructions about how to create the parcellation see 
+
 
 # FS WANTS ALL FOLDERS IN HIS ORIGINAL subjects FOLDER...MAYBE A BUG? SO I HAVE TO MOVE ALL TO THAT FOLDER AND THEN BACK
 ORIGINAL_SUBJECTS_DIR=$SUBJECTS_DIR
@@ -213,27 +213,8 @@ freeview -v sub-01_recon/mri/orig.mgz sub-01_recon/mri/aseg.mgz:colormap=LUT sub
 
 
 ## ---------------------- ##
-#DA MRTRIX3_CONNECTOME.py su GITHUB https://github.com/bids-apps/MRtrix3_connectome/blob/master/mrtrix3_connectome.py lines 2715-2725
- #        run.command('tck2connectome tractogram.tck'
- #                   ' parc.mif connectome.csv'
- #                   ' -tck_weights_in weights.csv'
- #                   ' -out_assignments assignments.csv'
- #                   + assignment_option)
- #       run.command('tck2connectome tractogram.tck'
- #                   ' parc.mif meanlength.csv'
- #                   ' -tck_weights_in weights.csv'
- #                   ' -scale_length'
- #                   ' -stat_edge mean'
- #                   + assignment_option)
-#
-# ANDYSBRAINBOOK STATES:
-# tck2connectome -symmetric -zero_diagonal -scale_invnodevol -tck_weights_in sift_1M.txt tracks_10M.tck sub-CON02_parcels.mif sub-CON02_parcels.csv -out_assignment assignments_sub-CON02_parcels.csv
-# tck2connectome -symmetric -zero_diagonal -scale_invnodevol -tck_weights_in sift_1M.txt tracks_10M.tck sub-CON02_parcels.mif sub-CON02_parcels.csv -out_assignment assignments_sub-CON02_parcels.csv
-#
-# I WOULD DO:
 
 # Converting the labels:
-# CONTROLLA COME USARE IN MRTRIX GLI ALTRI ATLAS
 labelconvert sub-01_recon/mri/aparc.HCPMMP1+aseg.mgz /usr/local/mrtrix3/share/mrtrix3/labelconvert/hcpmmp1_original.txt /usr/local/mrtrix3/share/mrtrix3/labelconvert/hcpmmp1_ordered.txt sub-01_parcels.mif	# Use aparc.a2009s+aseg.mgz and fs_a2009s.txt for Destrieux atlas parcellation, OR aparc+aseg.mgz and fs_default.txt for Desikan-Killiany atlas parcellation, OR aparc.HCPMMP1+aseg.mgz and hcpmmp1_original.txt and hcpmmp1_ordered.txt for HCPMMP1
 
 # Coregistering the parcellation:
@@ -245,45 +226,26 @@ tck2connectome -symmetric -zero_diagonal -tck_weights_in sift_71631K.txt tracks_
 # Create also the connectome weights divided by the sum of the volume of the two nodes
 tck2connectome -symmetric -zero_diagonal -scale_invnodevol -tck_weights_in sift_71631K.txt tracks_71631K.tck sub-01_parcels_coreg.mif sub-01_parcels_coreg_connectome_-invnodevol.csv -out_assignment assignments_sub-01_parcels_coreg_connectome_-invnodevol.csv
 
-# Produce additional data that can be used for visualisation within mrview (script MRtrix3_connectome.py rows 2602-2612)
+# Produce additional data that can be used for visualisation within mrview 
 label2colour sub-01_parcels_coreg.mif sub-01_parcels_coregRGB.mif -lut /usr/local/mrtrix3/share/mrtrix3/labelconvert/hcpmmp1_ordered.txt		# Convert a parcellated image (where values are node indices) into a coloured image of parcellated brain with colors of regions as from LUT provided: File->Open->sub-01_parcels_coregRGB.mif ; use fs_default.txt for DK atlas or fs_a2009s.txt for Destrieux atlas OR hcpmmp1_ordered.txt for HCPMMP1
 
-# Produce additional data that can be used for visualisation within mrview's connectome toolbar (script MRtrix3_connectome.py rows 2727-2740)
+# Produce additional data that can be used for visualisation within mrview's connectome toolbar
 connectome2tck tracks_71631K.tck assignments_sub-01_parcels_coreg_connectome.csv exemplars.tck -tck_weights_in sift_71631K.txt  -exemplars sub-01_parcels_coreg.mif -files single	# in MRview -> Connectome ->  Edge visualisation -> Geometry: Streamline -> select exemplars.tck
 label2mesh sub-01_parcels_coreg.mif nodes.obj
 meshfilter nodes.obj smooth nodes_smooth.obj			# in MRview -> Connectome -> Node visualisation -> Geometry:Mesh -> select nodes_smooth.obj
 rm nodes.obj
 
-# Viewing the connectome and meanlegth matrix in Matlab:
-# USE file View_SC_and_meanlength.m file in the same folder
-
-# Viewing the lookup labels:
-vi /usr/local/mrtrix3/share/mrtrix3/labelconvert/fs_a2009s.txt			# to read the lookup labels of the atlas parcellation (or open with the prefered text editor) for Destrieux atlas parcellation
-vi /usr/local/mrtrix3/share/mrtrix3/labelconvert/fs_default.txt			# to read the lookup labels of the atlas parcellation (or open with the prefered text editor) for Desikan-Killiany atlas parcellation
-vi /usr/local/mrtrix3/share/mrtrix3/labelconvert/hcpmmp1_ordered.txt			# to read the lookup labels of the atlas parcellation (or open with the prefered text editor) for HCPMMP1 atlas parcellation
-
-#METTI QUI SCRIPT X CONDUCTION VELOCITY CHE METTE I FILES IN UNA SOTTCARTELLA conduction_velocity_map MA PRENDE GLI INPUTS DA QUESTA E SALVA IL 01_conduction_velocity_coreg.nii.gz ANCHE QUI; DEVE ANCHE
-#USARE STESSO bet DI SYNB0-DISCO E COREGISTRARE/REGRID T2w A T1w USANDO FSL E MRTRIX (DA USARE POI CON SIMNIBS PER VEDERE SE RISOLVE IL PROBLEMA CON cras)
 
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------##
-# CONDUCTION VELOCITY CALCULATION
+# Conduction Velocity Calculation
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------##
 sh conduction_velocity_calculation_rev2.sh
-# use Matlab script View_SC_and_meanlength_and_meanvelocity.m to create picutres of velocity matrix
-matlab_path=/Applications/MATLAB_R2023b.app/bin/matlab
-${matlab_path} -nodisplay -r "View_SC_and_meanlength_and_meanvelocity; quit"
+
 
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------##
-## Use docker thevirtualbrain/tvb_converter:latest to convert MRtrix3 tck2connectome files and Freesurfer recon-all files to generate TVB inputs
+## Set different variables
+## the below contains parts tken from TVB Pipeline Converter available at https://github.com/BrainModes/tvb-pipeline-converter
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------##
-# As suggested on TVB Users Google Group at https://groups.google.com/g/tvb-users/c/FyduYQ5kGzE/m/wYBm5ucwAgAJ , for single
-# subject and use on local machine, use pipeline script at https://github.com/BrainModes/tvb-pipeline-converter/blob/master/pipeline.sh
-# which uses https://github.com/BrainModes/tvb-pipeline-converter/blob/master/tvb_converter_pipeline.sh
-# and this launches https://github.com/BrainModes/tvb-pipeline-converter/blob/master/convert2TVB_format.py
-# however the readme.md file at https://github.com/BrainModes/tvb-pipeline-converter/blob/master/README.md states "To run the converter locally without containerization, the convert2TVB_format.py Python script can be used directly."
-# so copy file convert2TVB_format.py in the working folder before running this script
-# The below is an extraction from above files
-
 
 # input_dir, folder with BIDS data set
 input_dir=`pwd`/input_dir
@@ -302,7 +264,7 @@ parcellation="hcpmmp1" # "desikan" or "destrieux" or "hcpmmp1" as atlas parcella
 n_cpus=11
 export OMP_NUM_THREADS=${n_cpus}
 
-# freesurf_license, path to a freesurfer license for fmriprep
+# freesurf_license, path to a freesurfer license
 freesurf_license="/Users/michelangelo/license.txt"
 
 # name of task fmri, as in the BIDS_dataset
@@ -317,13 +279,6 @@ tvb_workdir=${tvb_output}"/tmp"
 
 mkdir -p ${mrtrix_output} ${fmriprep_output} ${fmriprep_workdir} ${tvb_output} ${tvb_workdir} ${input_dir}
 
-###########################################################################################
-###########################################################################################
-###########################################################################################
-# run TVBconverter to generate TVB format data, additionally compute the EEG leadfield matrix
-
-# use the freesurfer folder of mrtrix3 pipeline
-# mrtrix_recon_all_dir is set
 recon_all_dir=`pwd`
 recon_all_name="sub-01_recon"
  
