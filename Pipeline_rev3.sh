@@ -281,6 +281,8 @@ sh conduction_velocity_calculation_rev2.sh
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------##
 ## Set different variables
 ## the below contains parts taken from TVB Pipeline Converter available at https://github.com/BrainModes/tvb-pipeline-converter
+## and based on the publication:
+## Schirner, M., Domide, L., Perdikis, D., Triebkorn, P., Stefanovski, L., Pai, R., ... & Ritter, P. (2022). Brain simulation as a cloud service: The Virtual Brain on EBRAINS. NeuroImage, 118973.
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------##
 
 # input_dir, folder with BIDS data set
