@@ -62,11 +62,14 @@ mrview mask.mif
 #CONSTRAINED SPHERICAL DECONVOLUTION
 
 # Estimating the Basis Functions 
-dwi2response dhollander sub-01_den_preproc_unbiased.mif wm.txt gm.txt csf.txt -voxels voxels.mif # create the Basis Function for each tissue WM GM CSF; The last option, “-voxels”, specifies an output dataset that shows which voxels from the image were used to construct the basis functions for each tissue type
-mrview sub-01_den_preproc_unbiased.mif -overlay.load voxels.mif 			# shows which voxels were used to construct a basis function for each tissue type. Red: CSF voxels; Green: Grey Matter voxels; Blue: White Matter voxels. Make sure that these colors are located where they should be; for example, the red voxels should be within the ventricles
+dwi2response dhollander sub-01_den_preproc_unbiased.mif wm.txt gm.txt csf.txt -voxels voxels.mif
+# create the Basis Function for each tissue WM GM CSF; The last option, “-voxels”, specifies an output dataset that shows which voxels from the image were used to construct the basis functions for each tissue type
+
+mrview sub-01_den_preproc_unbiased.mif -overlay.load voxels.mif 			
+# shows which voxels were used to construct a basis function for each tissue type. Red: CSF voxels; Green: Grey Matter voxels; Blue: White Matter voxels. Make sure that these colors are located where they should be; for example, the red voxels should be within the ventricles
 
 # Viewing the Basis Functions: check the response function for each tissue type:
-shview wm.txt # The first image that pops up will look like a sphere; this represents what the diffusion looks like within that tissue type when a b-value of zero has been applied - in other words, when there is no diffusion gradient. By pressing the right and left arrow keys, you can view what the basis function looks like when different b-values have been applied. Note how the overall magnitude (or size) of the sphere for each tissue type becomes smaller when higher b-values are applied; although higher b-values are more sensitive to changes in diffusion, the overall signal is smaller and more susceptible to noise. Within the white matter, the sphere tends to flatten into a pancake when diffusion gradients are applied, reflecting the preferential direction of diffusion along the white matter tracts in these voxels. For the grey matter and the cerebrospinal fluid, on the other hand, the basis function remains spherical across all of the b-values.
+shview wm.txt 
 shview gm.txt
 shview csf.txt	
 
@@ -98,40 +101,54 @@ mrview vf.mif -odf.load_sh wmfod_norm.mif
 
 # CREATING THE TISSUE BOUNDARY
 # Converting the anatomical image to MRtrix format
-mrconvert sub-01_T1w.nii.gz T1.mif 	# create T1w in mrtrix .mif file
-5ttgen fsl T1.mif 5tt_nocoreg.mif 		# use FSL command FAST to segment the anatomical image into the tissue types: 1- Grey Matter; 2- Subcortical Grey Matter (such as the amygdala and basal ganglia); 3- White Matter;
+mrconvert sub-01_T1w.nii.gz T1.mif 	
+# create T1w in mrtrix .mif file
+
+5ttgen fsl T1.mif 5tt_nocoreg.mif 		
+# use FSL command FAST to segment the anatomical image into the tissue types: 1- Grey Matter; 2- Subcortical Grey Matter (such as the amygdala and basal ganglia); 3- White Matter;
 															# 4- Cerebrospinal Fluid; 5- Pathological Tissue
-mrview 5tt_nocoreg.mif						# check results, arrows left and right to switch type
+mrview 5tt_nocoreg.mif						
+# check results, arrows left and right to switch type
 
 # Coregistering the Diffusion and Anatomical Images
 # Extracting the b0 images
-dwiextract sub-01_den_preproc_unbiased.mif - -bzero | mrmath - mean mean_b0.mif -axis 3	#average together the B0 images from the diffusion data; The left half of the command, dwiextract, takes the preprocessed diffusion-weighted image as an input,	and the -bzero option extracts the B0 images; the solitary - argument indicates that the output should be used as input for the second part of the command, to the right of the pipe. mrmath then takes these output B0 images and computes the mean along the 3rd axis, or the time dimension. In other words, if we start with an index of 0, then the number 3 indicates the 4th dimension, which simply means to average over all of the volumes.
+dwiextract sub-01_den_preproc_unbiased.mif - -bzero | mrmath - mean mean_b0.mif -axis 3
+#average together the B0 images from the diffusion data; The left half of the command, dwiextract, takes the preprocessed diffusion-weighted image as an input,	and the -bzero option extracts the B0 images; the solitary - argument indicates that the output should be used as input for the second part of the command, to the right of the pipe. mrmath then takes these output B0 images and computes the mean along the 3rd axis, or the time dimension. In other words, if we start with an index of 0, then the number 3 indicates the 4th dimension, which simply means to average over all of the volumes.
+
 # Converting the b0 and 5tt images to nii.gz format, so that we can use FSL to coregister diffusion and anatomical images:
 mrconvert mean_b0.mif mean_b0.nii.gz
 mrconvert 5tt_nocoreg.mif 5tt_nocoreg.nii.gz
 
 # Extracting the grey matter segmentation:
-fslroi 5tt_nocoreg.nii.gz 5tt_vol0.nii.gz 0 1			# flirt can only work with a single 3D image (not 4D datasets), we will use fslroi to extract the first volume of the segmented dataset, which corresponds to the Grey Matter segmentation
+fslroi 5tt_nocoreg.nii.gz 5tt_vol0.nii.gz 0 1			
+# flirt can only work with a single 3D image (not 4D datasets), we will use fslroi to extract the first volume of the segmented dataset, which corresponds to the Grey Matter segmentation
 
 # Coregistering the anatomical and diffusion datasets:
-flirt -in mean_b0.nii.gz -ref 5tt_vol0.nii.gz -interp nearestneighbour -dof 6 -omat diff2struct_fsl.mat 			# use the flirt command to coregister the two datasets; This command uses the grey matter segmentation (i.e., “5tt_vol0.nii.gz”) as the reference image,
+flirt -in mean_b0.nii.gz -ref 5tt_vol0.nii.gz -interp nearestneighbour -dof 6 -omat diff2struct_fsl.mat 			
+# use the flirt command to coregister the two datasets; This command uses the grey matter segmentation (i.e., “5tt_vol0.nii.gz”) as the reference image,
 																																									# meaning that it stays stationary. The averaged B0 images are then moved to find the best fit with the grey matter segmentation. The output of this command, “diff2struct_fsl.mat”, contains the transformation matrix that was used to overlay the diffusion image on top of the grey matter segmentation
 
 # Converting the transformation matrix to MRtrix format:
-transformconvert diff2struct_fsl.mat mean_b0.nii.gz 5tt_nocoreg.nii.gz flirt_import diff2struct_mrtrix.txt 	#  used the anatomical segmentation as the reference image. We did this because usually the coregistration is more accurate if the reference image has higher spatial resolution and sharper distinction between the tissue types
+transformconvert diff2struct_fsl.mat mean_b0.nii.gz 5tt_nocoreg.nii.gz flirt_import diff2struct_mrtrix.txt 	
+#  used the anatomical segmentation as the reference image. We did this because usually the coregistration is more accurate if the reference image has higher spatial resolution and sharper distinction between the tissue types
 
 # Applying the transformation matrix to the non-coregistered segmentation data:
-mrtransform 5tt_nocoreg.mif -linear diff2struct_mrtrix.txt -inverse 5tt_coreg.mif										# since we already have the steps to transform the diffusion image to the anatomical image, we can take the inverse of the transformation matrix to do the 																																											opposite - i.e., coregister the anatomical image to the diffusion image
+mrtransform 5tt_nocoreg.mif -linear diff2struct_mrtrix.txt -inverse 5tt_coreg.mif										
+# since we already have the steps to transform the diffusion image to the anatomical image, we can take the inverse of the transformation matrix to do the 																																											opposite - i.e., coregister the anatomical image to the diffusion image
+
 # Viewing the coregistration in mrview:
-mrview sub-01_den_preproc_unbiased.mif -overlay.load 5tt_nocoreg.mif -overlay.colourmap 2 -overlay.load 5tt_coreg.mif -overlay.colourmap 1		# The resulting file, “5tt_coreg.mif”, can be loaded into mrview in order to examine the quality of the coregistration
+mrview sub-01_den_preproc_unbiased.mif -overlay.load 5tt_nocoreg.mif -overlay.colourmap 2 -overlay.load 5tt_coreg.mif -overlay.colourmap 1		
+# The resulting file, “5tt_coreg.mif”, can be loaded into mrview in order to examine the quality of the coregistration
 																																																										# The “overlay.colourmap” options specify different color codes for each image that is loaded. In this case, the boundaries before coregistration will be depicted in blue, and the boundaries after coregistration will be shown in red
 
 # Creating the grey matter / white matter boundary:
-5tt2gmwmi 5tt_coreg.mif gmwmSeed_coreg.mif 			# the boundary separating the grey from the white matter, which we will use to create the seeds for our streamlines, is created with the command
-																						# 5tt2gmwmi (which stands for “5 Tissue Type (segmentation) to Grey Matter / White Matter Interface)
+5tt2gmwmi 5tt_coreg.mif gmwmSeed_coreg.mif 			
+# the boundary separating the grey from the white matter, which we will use to create the seeds for our streamlines, is created with the command
+# 5tt2gmwmi (which stands for “5 Tissue Type (segmentation) to Grey Matter / White Matter Interface)
 
 # Viewing the GM/WM boundary:
-mrview sub-01_den_preproc_unbiased.mif -overlay.load gmwmSeed_coreg.mif 		# check the result with mrview to make sure the interface is where we think it should be
+mrview sub-01_den_preproc_unbiased.mif -overlay.load gmwmSeed_coreg.mif 		
+# check the result with mrview to make sure the interface is where we think it should be
 
 
 # CREATING THE STREAMLINES
@@ -142,27 +159,35 @@ mrview sub-01_den_preproc_unbiased.mif -overlay.load gmwmSeed_coreg.mif 		# chec
 #num_streamlines=1000*num_nodes*(num_nodes-1)/2 # the SC matrix is 164*164 elements, but  one row is the diagonal which is zero (hence num_nodes-1) and it is symmetric (hence /2) so the nr of couples are num_nodes*(num_nodes-1)/2 and we want at least 1000 streamlines each couple
 #num_streamlines=71631000
 
-tckgen -act 5tt_coreg.mif -backtrack -crop_at_gmwmi -nthreads 11 -maxlength 250 -power 0.33 -select 71631000 wmfod_norm.mif tracks_71631K.tck -seed_dynamic wmfod_norm.mif				# In this command, the “-act” option specifies that we will use the anatomically-segmented image to constrain our analysis to the white matter. “-backtrack” indicates for the current streamline to go back and run the same streamline again if it terminates in a strange place (e.g., the cerebrospinal fluid); “-maxlength” sets the maximum tract length, that will be permitted; and “-cutoff” specifies the FOD amplitude for terminating a tract (for example, a value of 0.06 would not permit a streamline to go along an FOD that is lower than that number). “-seed_gmwmi” takes as an input the grey-matter / white-matter boundary that was generated using the 5tt2gmwmi command. “-nthreads” specifies the number of processing cores you wish to use, in order to speed up the analysis. And finally, “-select” indicates how many total streamlines to generate. Note that a shorthand can be used if you like; instead of, say, 10000000, you can rewrite it as 10000k (meaning “ten thousand thousands”, which equals “ten million”). The last two arguments specify both the input (wmfod_norm.mif) and a label for the output (tracks_71631K.tck). Length is in [mm]; modified as in mrtrix3_connectome.py to be used also for subcortical structures, see
+tckgen -act 5tt_coreg.mif -backtrack -crop_at_gmwmi -nthreads 11 -maxlength 250 -power 0.33 -select 71631000 wmfod_norm.mif tracks_71631K.tck -seed_dynamic wmfod_norm.mif				
+# In this command, the “-act” option specifies that we will use the anatomically-segmented image to constrain our analysis to the white matter. “-backtrack” indicates for the current streamline to go back and run the same streamline again if it terminates in a strange place (e.g., the cerebrospinal fluid); “-maxlength” sets the maximum tract length, that will be permitted; and “-cutoff” specifies the FOD amplitude for terminating a tract (for example, a value of 0.06 would not permit a streamline to go along an FOD that is lower than that number). “-seed_gmwmi” takes as an input the grey-matter / white-matter boundary that was generated using the 5tt2gmwmi command. “-nthreads” specifies the number of processing cores you wish to use, in order to speed up the analysis. And finally, “-select” indicates how many total streamlines to generate. Note that a shorthand can be used if you like; instead of, say, 10000000, you can rewrite it as 10000k (meaning “ten thousand thousands”, which equals “ten million”). The last two arguments specify both the input (wmfod_norm.mif) and a label for the output (tracks_71631K.tck). Length is in [mm]; modified as in mrtrix3_connectome.py to be used also for subcortical structures, see
 
 
 # Extracting a subset of tracks to check them in mrview:
 tckedit tracks_71631K.tck -number 300k smallerTracks_300k.tck
 
 # Viewing the tracks in mrview:
-mrview sub-01_den_preproc_unbiased.mif -tractography.load smallerTracks_300k.tck	# inspect this image to make sure that the streamlines end where you think they should; in other words, the streamlines should be constrained to the white matter, and they should be color-coded appropriately. For example, the corpus callosum should be mostly red, and the corona radiata should be mostly blue
-mrview T1.mif -tractography.load smallerTracks_300k.tck		# inspect streamlines in cerebellum
+mrview sub-01_den_preproc_unbiased.mif -tractography.load smallerTracks_300k.tck	
+# inspect this image to make sure that the streamlines end where you think they should; in other words, the streamlines should be constrained to the white matter, and they should be color-coded appropriately. For example, the corpus callosum should be mostly red, and the corona radiata should be mostly blue
+
+mrview T1.mif -tractography.load smallerTracks_300k.tck		
+# inspect streamlines in cerebellum and others
 
 # Refining the Streamlines with tcksift2 (Sifting the tracks with tcksift2):
-tcksift2 -act 5tt_coreg.mif -out_mu sift_mu.txt -out_coeffs sift_coeffs.txt -nthreads 11 tracks_71631K.tck wmfod_norm.mif sift_71631K.txt -fd_scale_gm		# some tracts will be threaded with more streamlines than others, because the fiber orientation densities are much clearer and more attractive candidates for the probabilistic sampling algorithm that was discussed above. In other words, certain tracts can be over-represented by the amount of streamlines that pass through them not necessarily because they contain more fibers, but because the fibers tend to all be orientated in the same direction. To counter-balance this overfitting, the command tcksift2 will create a text file containing weights for each voxel in the brain; -fd_scale_gm added as in mrtrix3_connectome.py because we use single-shell (Bvalue=0 and 1000)
+tcksift2 -act 5tt_coreg.mif -out_mu sift_mu.txt -out_coeffs sift_coeffs.txt -nthreads 11 tracks_71631K.tck wmfod_norm.mif sift_71631K.txt -fd_scale_gm		
+# some tracts will be threaded with more streamlines than others, because the fiber orientation densities are much clearer and more attractive candidates for the probabilistic sampling algorithm that was discussed above. In other words, certain tracts can be over-represented by the amount of streamlines that pass through them not necessarily because they contain more fibers, but because the fibers tend to all be orientated in the same direction. To counter-balance this overfitting, the command tcksift2 will create a text file containing weights for each voxel in the brain; -fd_scale_gm added as in mrtrix3_connectome.py because we use single-shell (Bvalue=0 and 1000)
 
 ## CREATING THE CONNECTOME
 # Run FreeSurfer recon-all command:
-export FS_LICENSE=$HOME/license.txt									# where FreeSurfer license.txt is located
-export FREESURFER_HOME=/Applications/freesurfer/7.3.2	# where FS is located
-source $FREESURFER_HOME/SetUpFreeSurfer.sh					# start FS
-which freeview																				# version of FS "freeview"
-SUBJECTS_DIR=`pwd`																# SUBJECTS_DIR tells FS where to locate the folder with the output of recon-all
-#recon-all -i sub-01_T1w.nii.gz -s sub-01_recon -all						# run FS recon-all command, input -i is the T1w and -s is the name of the output folder, -all to perform all what the command recon-all can do
+export FS_LICENSE=$HOME/license.txt									
+# where FreeSurfer license.txt is located
+export FREESURFER_HOME=/Applications/freesurfer/7.3.2	
+# where FS is located
+source $FREESURFER_HOME/SetUpFreeSurfer.sh					
+# start FS
+SUBJECTS_DIR=`pwd`																
+# SUBJECTS_DIR tells FS where to locate the folder with the output of recon-all
+
 
 
 
@@ -171,7 +196,9 @@ printf 'mri_normalize -mprage -b 20 -n 5 -gentle \n mri_watershed -h 5 -atlas -u
 
 recon-all -i sub-01_T1w.nii.gz -s sub-01_recon -autorecon1 -expert xopts.txt	
 
-recon-all -s sub-01_recon -autorecon2 -careg # -careg is needed only for FreeSurfer7.3.2 because of a bug of this version (does not create the talairach.m3z) 
+recon-all -s sub-01_recon -autorecon2 -careg 
+# -careg is needed only for FreeSurfer7.3.2 because of a bug of this version (does not create the talairach.m3z) 
+
 #recon-all -s sub-01_recon -autorecon2-wm 
 recon-all -s sub-01_recon -autorecon3
 
@@ -179,7 +206,9 @@ recon-all -s sub-01_recon -autorecon3
 # Volumes: T1.mgz brainmask.mgz
 # Surfaces: lh.pial rh.pial lh.white rh.white
 # using the following FreeSurfer command:
-freeview -v sub-01_recon/mri/T1.mgz  sub-01_recon/mri/brainmask.mgz -f sub-01_recon/surf/lh.pial:edgecolor=red sub-01_recon/surf/lh.white:edgecolor=yellow sub-01_recon/surf/rh.pial:edgecolor=red sub-01_recon/surf/rh.white:edgecolor=yellow # Open Freeview with volumes and surfaces loaded as per command, also uses yellow and red for WM and GM edges
+freeview -v sub-01_recon/mri/T1.mgz  sub-01_recon/mri/brainmask.mgz -f sub-01_recon/surf/lh.pial:edgecolor=red sub-01_recon/surf/lh.white:edgecolor=yellow sub-01_recon/surf/rh.pial:edgecolor=red sub-01_recon/surf/rh.white:edgecolor=yellow 
+# Open Freeview with volumes and surfaces loaded as per command, also uses yellow and red for WM and GM edges
+
 # Check above view for following Errors:
 # SkullStripping Errors...
 # Pial Surfaces Errors
@@ -209,30 +238,36 @@ rm -r $FREESURFER_HOME/subjects/sub-01_recon
 SUBJECTS_DIR=$ORIGINAL_SUBJECTS_DIR
 # after finished copy the only new files to the original sub-01_recon folder: sub-01_recon/mri/aparc.HCPMMP1+aseg.mgz , sub-01_recon/label/lh.HCPMMP1.annot , sub-01_recon/label/rh.HCPMMP1.annot ...then remove the sub-01_recon folder in $FREESURFER_HOME/subjects folder
 # View on parcellation of surface cortex and segmentation of subcortical volumes
-freeview -v sub-01_recon/mri/orig.mgz sub-01_recon/mri/aseg.mgz:colormap=LUT sub-01_recon/mri/aparc.HCPMMP1+aseg.mgz:colormap=LUT -f sub-01_recon/surf/lh.pial:edgecolor=red sub-01_recon/surf/lh.white:edgecolor=yellow sub-01_recon/surf/rh.pial:edgecolor=red sub-01_recon/surf/rh.white:edgecolor=yellow # launch freeview with volumes in folder mri and files orig.mgz and aseg.mgz this latter uses a colormap contained in the LookUp Table, volume aparc+aseg.mgz contains parcellation/segmentation with DK atlas; aparc.a2009s+aseg.mgz for Destrieux; aparc.HCPMMP1+aseg.mgz for HCPMM1; also surfaces -f in folder surf lh.pial and rh.pial with color red and lh.white and rh.white with color yellow
+freeview -v sub-01_recon/mri/orig.mgz sub-01_recon/mri/aseg.mgz:colormap=LUT sub-01_recon/mri/aparc.HCPMMP1+aseg.mgz:colormap=LUT -f sub-01_recon/surf/lh.pial:edgecolor=red sub-01_recon/surf/lh.white:edgecolor=yellow sub-01_recon/surf/rh.pial:edgecolor=red sub-01_recon/surf/rh.white:edgecolor=yellow 
+# launch freeview with volumes in folder mri and files orig.mgz and aseg.mgz this latter uses a colormap contained in the LookUp Table, volume aparc+aseg.mgz contains parcellation/segmentation with DK atlas; aparc.a2009s+aseg.mgz for Destrieux; aparc.HCPMMP1+aseg.mgz for HCPMM1; also surfaces -f in folder surf lh.pial and rh.pial with color red and lh.white and rh.white with color yellow
 
 
 ## ---------------------- ##
 
 # Converting the labels:
-labelconvert sub-01_recon/mri/aparc.HCPMMP1+aseg.mgz /usr/local/mrtrix3/share/mrtrix3/labelconvert/hcpmmp1_original.txt /usr/local/mrtrix3/share/mrtrix3/labelconvert/hcpmmp1_ordered.txt sub-01_parcels.mif	# Use aparc.a2009s+aseg.mgz and fs_a2009s.txt for Destrieux atlas parcellation, OR aparc+aseg.mgz and fs_default.txt for Desikan-Killiany atlas parcellation, OR aparc.HCPMMP1+aseg.mgz and hcpmmp1_original.txt and hcpmmp1_ordered.txt for HCPMMP1
+labelconvert sub-01_recon/mri/aparc.HCPMMP1+aseg.mgz /usr/local/mrtrix3/share/mrtrix3/labelconvert/hcpmmp1_original.txt /usr/local/mrtrix3/share/mrtrix3/labelconvert/hcpmmp1_ordered.txt sub-01_parcels.mif	
+# Use aparc.a2009s+aseg.mgz and fs_a2009s.txt for Destrieux atlas parcellation, OR aparc+aseg.mgz and fs_default.txt for Desikan-Killiany atlas parcellation, OR aparc.HCPMMP1+aseg.mgz and hcpmmp1_original.txt and hcpmmp1_ordered.txt for HCPMMP1
 
 # Coregistering the parcellation:
 mrtransform sub-01_parcels.mif -interp nearest -linear diff2struct_mrtrix.txt -inverse -datatype uint32 sub-01_parcels_coreg.mif
 # Creating the connectome WITH coregistration
 tck2connectome -symmetric -zero_diagonal -tck_weights_in sift_71631K.txt tracks_71631K.tck sub-01_parcels_coreg.mif sub-01_parcels_coreg_connectome.csv -out_assignment assignments_sub-01_parcels_coreg_connectome.csv
-tck2connectome -symmetric -zero_diagonal -tck_weights_in sift_71631K.txt tracks_71631K.tck sub-01_parcels_coreg.mif sub-01_parcels_coreg_meanlength.csv  -scale_length -stat_edge mean # length are in [mm]
+tck2connectome -symmetric -zero_diagonal -tck_weights_in sift_71631K.txt tracks_71631K.tck sub-01_parcels_coreg.mif sub-01_parcels_coreg_meanlength.csv  -scale_length -stat_edge mean 
+# length are in [mm]
 
 # Create also the connectome weights divided by the sum of the volume of the two nodes
 tck2connectome -symmetric -zero_diagonal -scale_invnodevol -tck_weights_in sift_71631K.txt tracks_71631K.tck sub-01_parcels_coreg.mif sub-01_parcels_coreg_connectome_-invnodevol.csv -out_assignment assignments_sub-01_parcels_coreg_connectome_-invnodevol.csv
 
 # Produce additional data that can be used for visualisation within mrview 
-label2colour sub-01_parcels_coreg.mif sub-01_parcels_coregRGB.mif -lut /usr/local/mrtrix3/share/mrtrix3/labelconvert/hcpmmp1_ordered.txt		# Convert a parcellated image (where values are node indices) into a coloured image of parcellated brain with colors of regions as from LUT provided: File->Open->sub-01_parcels_coregRGB.mif ; use fs_default.txt for DK atlas or fs_a2009s.txt for Destrieux atlas OR hcpmmp1_ordered.txt for HCPMMP1
+label2colour sub-01_parcels_coreg.mif sub-01_parcels_coregRGB.mif -lut /usr/local/mrtrix3/share/mrtrix3/labelconvert/hcpmmp1_ordered.txt		
+# Convert a parcellated image (where values are node indices) into a coloured image of parcellated brain with colors of regions as from LUT provided: File->Open->sub-01_parcels_coregRGB.mif ; use fs_default.txt for DK atlas or fs_a2009s.txt for Destrieux atlas OR hcpmmp1_ordered.txt for HCPMMP1
 
 # Produce additional data that can be used for visualisation within mrview's connectome toolbar
-connectome2tck tracks_71631K.tck assignments_sub-01_parcels_coreg_connectome.csv exemplars.tck -tck_weights_in sift_71631K.txt  -exemplars sub-01_parcels_coreg.mif -files single	# in MRview -> Connectome ->  Edge visualisation -> Geometry: Streamline -> select exemplars.tck
+connectome2tck tracks_71631K.tck assignments_sub-01_parcels_coreg_connectome.csv exemplars.tck -tck_weights_in sift_71631K.txt  -exemplars sub-01_parcels_coreg.mif -files single	
+# in MRview -> Connectome ->  Edge visualisation -> Geometry: Streamline -> select exemplars.tck
 label2mesh sub-01_parcels_coreg.mif nodes.obj
-meshfilter nodes.obj smooth nodes_smooth.obj			# in MRview -> Connectome -> Node visualisation -> Geometry:Mesh -> select nodes_smooth.obj
+meshfilter nodes.obj smooth nodes_smooth.obj			
+# in MRview -> Connectome -> Node visualisation -> Geometry:Mesh -> select nodes_smooth.obj
 rm nodes.obj
 
 
@@ -244,7 +279,7 @@ sh conduction_velocity_calculation_rev2.sh
 
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------##
 ## Set different variables
-## the below contains parts tken from TVB Pipeline Converter available at https://github.com/BrainModes/tvb-pipeline-converter
+## the below contains parts taken from TVB Pipeline Converter available at https://github.com/BrainModes/tvb-pipeline-converter
 ##------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------##
 
 # input_dir, folder with BIDS data set
@@ -270,7 +305,7 @@ freesurf_license="/Users/michelangelo/license.txt"
 # name of task fmri, as in the BIDS_dataset
 task_name="rest"
 
-# create subfolder for pipeline to store results
+# create subfolders for pipeline to store results
 mrtrix_output=${output_dir}"/mrtrix_output"
 fmriprep_output=${output_dir}"/fmriprep_output"
 fmriprep_workdir=${fmriprep_output}"/tmp"
@@ -289,32 +324,26 @@ velocities_path=`pwd`/"sub-01_parcels_coreg_meanvelocity.csv"
 parc_image=`pwd`/"sub-${participant_label}_parc-${parcellation}_indices.nii.gz"
 
 
-# copy LUT file .txt from mrtrix3 for the parcellation atlas used: fs_a2009s.txt for Destrieux atlas parcellation, OR fs_default.txt for Desikan-Killiany atlas parcellation, OR hcpmmp1_ordered.txt for HCPMMP1
+# copy LUT file .txt from mrtrix3 for the parcellation atlas used: fs_a2009s.txt for Destrieux atlas parcellation, fs_default.txt for Desikan-Killiany atlas parcellation, OR hcpmmp1_ordered.txt for HCPMMP1
 cp /usr/local/mrtrix3/share/mrtrix3/labelconvert/hcpmmp1_ordered.txt ${mrtrix_output}
 
-# docker run -i --rm -v ${output_dir}:${output_dir} -v ${input_dir}:${input_dir} -v ${freesurf_license}:/opt/freesurfer/license.txt \
-#        thevirtualbrain/tvb_converter:latest ${input_dir} ${output_dir} ${mrtrix_output} ${fmriprep_output} ${fmriprep_workdir} \
-#        ${tvb_output} ${tvb_workdir} ${recon_all_dir} ${recon_all_subject_name} ${participant_label} ${task_name} \
-#       ${parcellation} ${weighs_path} ${tracts_path} ${n_cpus} 
+# the script converting outputs to TVB format needs MNE python available in a conda environment called "mne"
+# this can be created yourself or with below commands
+# conda create -y --name mne python=3.10
+# pip install mne
 
-# the convert2TVB_format.py script needs MNE python available at https://mne.tools/0.23/install/mne_python.html with the command below OR install manually from https://mne.tools/stable/install/installers.html#installers
-#conda create --name=mne --channel=conda-forge mne
-#conda install --name=base nb_conda_kernels
-#source activate mne
-
+# convert the file used for creating the SC matrix above to nii.gz format, in order to use it for parc_image variable of "convert2TVB_format-modified_MIDSURFACE_rev2.py"
 mrconvert sub-01_parcels_coreg.mif sub-01_parc-${parcellation}_indices.nii.gz
-# convert the file used for creating the SC matrix above to nii.gz format, in order to use it for parc_image variable of "convert2TVB_format-modified.py": this name was used in mrtrix3_connectome.py before the change on 20th May 2020, see https://github.com/bids-apps/MRtrix3_connectome/commit/0b89caef0aec2d932ff78f9466599917abeb9622 , from '_indices.nii.gz' to '_dseg.nii.gz' which is current mrtrix3_connectome.py line 1922 , which refers to parc.mif which is the file used to create the connectome.csv and meanlength.csv files, see lines 2715-2725 in mrtrix3_connectome.py https://github.com/bids-apps/MRtrix3_connectome/blob/master/mrtrix3_connectome.py and is the same that in my pipeline is called sub-01_parcels_coreg.mif
-
 
 
 ## DOWNSAMPLE THE ORIGINAL FREESURFER PIAL SURFACE fsaverage (7) 327680 TRIANGLES  TO fsaverage6 (81920 TRIANGLES) OR fsaverage5 (20480 TRIANGLES)
 # change below the correct annotation: either aparc.annot for Desikan-Killiany OR aparc.a2009s.annot for Destrieux OR HCPMMP1.annot for HCPMMP1
 # change below fsaverage6 for 81920 triangles or fsaverage5 for 20480 triangles
-# https://groups.google.com/g/tvb-users/c/6hI1V63fEVM/m/aLWVs14-AwAJ
-# https://www.mail-archive.com/freesurfer@nmr.mgh.harvard.edu/msg20831.html
-# https://brainhack-princeton.github.io/handbook/content_pages/04-02-templates.html
-# cp -n avoid to overwrite if the original file already exists, chmod 0444 set as read only...if needed manually select the file, right click-> Ottieni informazioni-> michelangelo Lettura e scrittura
+# cp -n avoid to overwrite if the original file already exists, chmod 0444 set as read only
+
+# change the path below as needed
 cp -R /Applications/freesurfer/7.3.2/subjects/fsaverage5 ${recon_all_dir}
+
 cp -n ${recon_all_dir}/sub-01_recon/surf/lh.pial.T1 ${recon_all_dir}/sub-01_recon/surf/lh.pial.T1_original
 cp -n ${recon_all_dir}/sub-01_recon/surf/rh.pial.T1 ${recon_all_dir}/sub-01_recon/surf/rh.pial.T1_original
 cp -n ${recon_all_dir}/sub-01_recon/surf/lh.white ${recon_all_dir}/sub-01_recon/surf/lh.white_original
@@ -337,7 +366,7 @@ mri_surf2surf --srcsubject sub-01_recon --trgsubject fsaverage5  --hemi lh --sva
 mri_surf2surf --srcsubject sub-01_recon --trgsubject fsaverage5  --hemi rh --sval-annot  ${recon_all_dir}/sub-01_recon/label/rh.HCPMMP1.annot --tval ${recon_all_dir}/sub-01_recon/label/rh.HCPMMP1.annot
 
 rm -r fsaverage5
-# COSA FA IL NUOVO .ANNOT?
+
 
 ##USE simnibs_pipeline.sh AND THEN TDCSLeadfield_calc.py TO CREATE THE FILES sub-01_outer_skin.mat sub-01_EEG_Locations.txt sub-01_EEGProjection_wdummy.mat NEEDED BY THE PYTHON SCRIPT
   
@@ -354,14 +383,14 @@ rm Plot_LF_gmsh.py
 cd SimNIBS
 # the script simibs_pipeline.sh performs charm and dwi2cond (eventually if needed also eeg_positions)
 sh simnibs_pipeline.sh
+# a conda environment with Simnibs called simnibs_env must be created by the user...see also https://github.com/simnibs/simnibs/discussions/379#discussioncomment-10052625
 conda activate simnibs_env
 python TDCSLeadfield_calc.py ${recon_all_name} ${recon_all_dir} ${participant_label}
 conda deactivate
 cd ..
 leadfield_path=`pwd`/SimNIBS/leadfield
 
-# activate conda environment called "mne" after having installed above; if .mne-python is present, use one of the two; to check the list of available conda environments and their names use the bash command: conda info --envs (the star shows the active one);
-# check the file .bash_profile to comment the FSL Setup part, otherwise the command "python" launched in bash will take the fsl environment instead of the one activated above; you can uncomment after having launched
+# activate conda environment called "mne" after having installed above; 
 conda activate mne
 
 
@@ -381,12 +410,11 @@ amp=1.0
 midpoint=0.0
 offset=0.0
 
+# a conda environment called tvb-run with tvb installed must be present
 conda activate tvb-run
 for i in ${!sigma_array[@]}; do
 python Create_LocalConnectivity_and_h5inputsGUI.py ${tvb_output}/ ${tvb_output}/ ${save_path_h5GUI} ${subject_name} ${sigma_array[$i]} ${amp} ${midpoint} ${offset}
 done
 conda deactivate
-
-# if of interest, open elaborate_LFsimnibs.m and import in Brainstorm the Leadfield Matrix
 
 
